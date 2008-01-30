@@ -1,0 +1,28 @@
+This package was first debianized by Christoph Wegscheider <christoph.wegscheider@wegi.net> on
+Tue,  6 Jul 2004 08:43:21 +0200.
+It is now maintained by Simon Boulet <simon@nostalgeek.com>.
+
+It was downloaded from: http://www.rsnapshot.org/
+
+Upstream Author: Nathan Rosenquist <nathan@rsnapshot.org>
+
+Copyright:
+
+   Copyright (C) 2003-2005 Nathan Rosenquist
+
+   Portions Copyright (C) 2002-2006 Mike Rubel, Carl Wilhelm Soderstrom,
+   Ted Zlatanov, Carl Boe, Shane Liebling, Bharat Mediratta,
+   Peter Palfrader, Nicolas Kaiser, David Cantrell, Chris Petersen,
+   Robert Jackson, Justin Grote, David Keegel, Alan Batie
+
+   rsnapshot comes with ABSOLUTELY NO WARRANTY.  This is free software,
+   and you may copy, distribute and/or modify it under the terms of
+   the GNU GPL (version 2 or at your option any later version).
+   See the GNU General Public License for details.
+
+   Based on code originally by Mike Rubel
+   http://www.mikerubel.org/computers/rsync_snapshots/
+
+On Debian GNU/Linux systems, the complete text of the GNU General
+Public License can be found in `/usr/share/common-licenses/GPL'.
+
