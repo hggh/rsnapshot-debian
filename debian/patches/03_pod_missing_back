@@ -1,0 +1,13 @@
+Add missing "=back" to fix pod2man error.
+
+--- a/rsnapshot-program.pl
++++ b/rsnapshot-program.pl
+@@ -6716,6 +6716,8 @@
+ 
+ =back
+ 
++=back
++
+ =head1 USAGE
+ 
+ B<rsnapshot> can be used by any user, but for system-wide backups

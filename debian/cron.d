@@ -1,4 +1,4 @@
-# This is a sample cron file for rsnapshot. 
+# This is a sample cron file for rsnapshot.
 # The values used correspond to the examples in /etc/rsnapshot.conf.
 # There you can also set the backup points and many other things.
 #

@@ -1,9 +1,7 @@
 #!/usr/bin/make -f
 # -*- makefile -*-
-# This file was originally written by Joey Hess and Craig Small.
-# As a special exception, when this file is copied by dh-make into a
-# dh-make output file, you may use that output file without restriction.
-# This special exception was added by Craig Small in version 0.37 of dh-make.
+
+include /usr/share/quilt/quilt.make
 
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
@@ -18,43 +16,66 @@ DEB_BUILD_GNU_TYPE  ?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
 
 config.status: configure
 	dh_testdir
-
-	# Add here commands to configure the package.
-	touch aclocal.m4 Makefile.in configure
-	./configure --host=$(DEB_HOST_GNU_TYPE) --build=$(DEB_BUILD_GNU_TYPE) \
-	--prefix=/usr --mandir=\$${prefix}/share/man --infodir=\$${prefix}/share/info --sysconfdir=/etc
-
-#Architecture 
-build: build-indep
-
-build-indep: build-indep-stamp
-build-indep-stamp:  config.status
-
-	# Add here commands to compile the indep part of the package.
-	touch $@
-
-clean:
-	dh_testdir
-	dh_testroot
-	rm -f build-indep-stamp
-
-	# Add here commands to clean up after the build process.
-	-$(MAKE) distclean
+ifeq "$(wildcard config.sub.bak)" ""
+	cp -f config.sub config.sub.bak
+endif
+ifeq "$(wildcard config.guess.bak)" ""
+	cp -f config.guess config.guess.bak
+endif
 ifneq "$(wildcard /usr/share/misc/config.sub)" ""
 	cp -f /usr/share/misc/config.sub config.sub
 endif
 ifneq "$(wildcard /usr/share/misc/config.guess)" ""
 	cp -f /usr/share/misc/config.guess config.guess
 endif
+ifeq "$(wildcard rsnapshot.1.bak)" ""
+	cp -f rsnapshot.1 rsnapshot.1.bak
+endif
+ifeq "$(wildcard rsnapshot-diff.1.bak)" ""
+	cp -f rsnapshot-diff.1 rsnapshot-diff.1.bak
+endif
 
 
-	dh_clean 
+	# Add here commands to configure the package.
+	touch aclocal.m4 Makefile.in configure
+	./configure --host=$(DEB_HOST_GNU_TYPE) --build=$(DEB_BUILD_GNU_TYPE) \
+	--prefix=/usr --mandir=\$${prefix}/share/man --infodir=\$${prefix}/share/info --sysconfdir=/etc
+
+#Architecture
+build: patch build-indep
+
+build-indep: build-indep-stamp
+build-indep-stamp: config.status
+
+	# Add here commands to compile the indep part of the package.
+	touch $@
+
+clean: unpatch
+	dh_testdir
+	dh_testroot
+	rm -f build-indep-stamp
+
+	# Add here commands to clean up after the build process.
+	[ ! -f Makefile ] || $(MAKE) distclean
+ifneq "$(wildcard config.sub.bak)" ""
+	cp -f config.sub.bak config.sub
+endif
+ifneq "$(wildcard config.guess.bak)" ""
+	cp -f config.guess.bak config.guess
+endif
+ifneq "$(wildcard rsnapshot.1.bak)" ""
+	cp -f rsnapshot.1.bak rsnapshot.1
+endif
+ifneq "$(wildcard rsnapshot-diff.1.bak)" ""
+	cp -f rsnapshot-diff.1.bak rsnapshot-diff.1
+endif
+	dh_clean
 
 install: install-indep
 install-indep:
 	dh_testdir
 	dh_testroot
-	dh_clean -k -i 
+	dh_prep
 	dh_installdirs -i
 
 	# Add here commands to install the indep part of the package into
@@ -62,6 +83,15 @@ install-indep:
 	$(MAKE) install DESTDIR=$(CURDIR)/debian/rsnapshot
 	cp $(CURDIR)/docs/HOWTOs/rsnapshot-HOWTO.en.html $(CURDIR)/debian/rsnapshot/usr/share/doc/rsnapshot/html/
 	mv $(CURDIR)/debian/rsnapshot/etc/rsnapshot.conf.default $(CURDIR)/debian/rsnapshot/etc/rsnapshot.conf
+
+	# Manpages
+	mkdir -p $(CURDIR)/debian/rsnapshot/usr/share/man/man1
+	gzip -9 -c $(CURDIR)/rsnapshot.1 > $(CURDIR)/debian/rsnapshot/usr/share/man/man1/rsnapshot.1.gz
+	gzip -9 -c $(CURDIR)/rsnapshot-diff.1 > $(CURDIR)/debian/rsnapshot/usr/share/man/man1/rsnapshot-diff.1.gz
+
+	# lintian override on /var/cache/rsnapshot perms
+	mkdir -p $(CURDIR)/debian/rsnapshot/usr/share/lintian/overrides/
+	cp $(CURDIR)/debian/lintian-overrides $(CURDIR)/debian/rsnapshot/usr/share/lintian/overrides/rsnapshot
 
 	dh_install -i
 
@@ -75,29 +105,19 @@ binary-common:
 	# Remove unnecessary extra license file, as per Policy Manual section 12.5
 	rm $(CURDIR)/debian/rsnapshot/usr/share/doc/rsnapshot/examples/utils/rsnapshotdb/LICENSE.txt
 
-#	dh_installmenu
-#	dh_installdebconf	
 	dh_installlogrotate	
-#	dh_installemacsen
-#	dh_installpam
-#	dh_installmime
-#	dh_python
-#	dh_installinit
 	dh_installcron
-#	dh_installinfo
 	dh_installman
 	dh_link
 	dh_strip
-	dh_compress 
+	dh_compress
 	dh_fixperms
 
 	# Fix permissions of the default rsnapshot_root directory
 	chmod 0700 $(CURDIR)/debian/rsnapshot/var/cache/rsnapshot
 
 	dh_perl
-#	dh_makeshlibs
 	dh_installdeb
-#	dh_shlibdeps
 	dh_gencontrol
 	dh_md5sums
 	dh_builddeb

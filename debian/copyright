@@ -1,10 +1,13 @@
 This package was first debianized by Christoph Wegscheider <christoph.wegscheider@wegi.net> on
 Tue,  6 Jul 2004 08:43:21 +0200.
-It is now maintained by Simon Boulet <simon@nostalgeek.com>.
+Maintained by Simon Boulet <simon@nostalgeek.com> since 2008.
+It is now maintained by Guillaume Delacour <gui@iroqwa.org>.
 
 It was downloaded from: http://www.rsnapshot.org/
 
-Upstream Author: Nathan Rosenquist <nathan@rsnapshot.org>
+Upstream Author:
+
+	Nathan Rosenquist <nathan@rsnapshot.org>
 
 Copyright:
 
@@ -23,6 +26,9 @@ Copyright:
    Based on code originally by Mike Rubel
    http://www.mikerubel.org/computers/rsync_snapshots/
 
-On Debian GNU/Linux systems, the complete text of the GNU General
-Public License can be found in `/usr/share/common-licenses/GPL'.
+License:
 
+	GPL-2
+
+On Debian GNU/Linux systems, the complete text of the GNU General
+Public License can be found in `/usr/share/common-licenses/GPL-2'.

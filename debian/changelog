@@ -1,3 +1,42 @@
+rsnapshot (1.3.1-1) unstable; urgency=low
+
+  * New maintainer
+  * New upstream release (Closes: #548966, #501992, #517657, #413439)
+  * debian/control:
+    - Bump Standards-Version 3.8.3.0
+    - Homepage moved in extended description
+    - Recommend openssh-client instead of ssh (Closes: #422262)
+    - Depend on liblchown-perl (Closes: #497928)
+    - Build-Depends-Indep on openssh-client, to have ssh client path in
+      rsnapshot.conf at build time (Closes: #506760)
+  * debian/postrm: Add "set -e" to script
+  * debian/rules:
+    - remove warning ignorement ("-") in clean rule, test Makefile
+    - Bump debhelper compat version to 7 (dh_prep replacement)
+    - Delete unnecessary commented template based rules
+  * debian/copyright: Link to GPL-2
+  * debian/patches/01_logfile_rsnapshot_conf:
+    change commented /var/log/rsnapshot to /var/log/rsnapshot.log
+    in rsnapshot.conf (Closes: #506218)
+  * debian/patches/02_default_rsnapshot_conf_manpage:
+    point to /usr/share/doc/rsnapshot/examples/rsnapshot.conf.default.gz
+    instead of non-existent /etc/rsnapshot.conf.default file in manpage
+    (Closes: #411317)
+  * debian/patches/04_default_backup_dir:
+    Really set /var/cache/rsnapshot as default snapshot dir
+  * debian/patches/05_backup_pgsql:
+    Modify backup_pgsql.sh according Debian specific (Closes: #500082)
+    Thanks to Antony Gelberg
+  * debian/patches/06_fix_random_file_verify:
+    Fix some error on upstream example utils/random_file_verify.sh
+  * Add doc-base support to html doc (Closes: #504920)
+  * debian/lintian-overrides: add override on /var/cache/rsnapshot perms
+    (700 instead of 755)
+  * debian/README.Debian: add some explanations on rsnapshot behavior
+    (Closes: #496908)
+
+ -- Guillaume Delacour <gui@iroqwa.org>  Wed, 18 Nov 2009 00:05:53 +0000
+
 rsnapshot (1.3.0-2) unstable; urgency=low
 
   * Add experimental release to unstable (Closes: #460579)
