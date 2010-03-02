@@ -4,7 +4,7 @@
 #                                                                      #
 # rsnapshot                                                            #
 # by Nathan Rosenquist                                                 #
-# now maintained by David Cantrell                                     #
+# now maintained by David Keegel                                       #
 #                                                                      #
 # The official rsnapshot website is located at                         #
 # http://www.rsnapshot.org/                                            #
@@ -26,7 +26,7 @@
 #                                                                      #
 ########################################################################
 
-# $Id: rsnapshot-program.pl,v 1.359 2006/10/21 06:09:50 djk20 Exp $
+# $Id: rsnapshot-program.pl,v 1.398 2008/08/09 02:15:49 djk20 Exp $
 
 # tabstops are set to 4 spaces
 # in vi, do: set ts=4 sw=4
@@ -63,7 +63,7 @@ my $have_lchown = 0;
 $| = 1;
 
 # version of rsnapshot
-my $VERSION = '1.3.0';
+my $VERSION = '1.3.1';
 
 # command or interval to execute (first cmd line arg)
 my $cmd;
@@ -84,6 +84,10 @@ my @rollback_points;
 # "intervals" are user defined time periods (e.g., hourly, daily)
 # this array holds hash_refs containing the name of the interval,
 # and the number of snapshots to keep of it
+#
+# NB, intervals and now called backup levels, and the config parameter
+# is 'retain'
+
 my @intervals;
 
 # store interval data (mostly info about which one we're on, what was before, etc.)
@@ -103,6 +107,7 @@ my @reserved_words = qw(
 	help
 	history
 	list
+	print-config
 	restore
 	rollback
 	sync
@@ -114,10 +119,13 @@ my @reserved_words = qw(
 # global flags that change the outcome of the program,
 # and are configurable by both cmd line and config flags
 #
-my $test			= 0; # turn verbose on, but don't execute any filesystem commands
-my $do_configtest	= 0; # parse config file and exit
-my $one_fs			= 0; # one file system (don't cross partitions within a backup point)
-my $link_dest		= 0; # use the --link-dest option to rsync
+my $test			= 0; # turn verbose on, but don't execute
+                                     # any filesystem commands
+my $do_configtest		= 0; # parse config file and exit
+my $one_fs			= 0; # one file system (don't cross
+                                     # partitions within a backup point)
+my $link_dest			= 0; # use the --link-dest option to rsync
+my $stop_on_stale_lockfile	= 0; # stop if there is a stale lockfile
 
 # how much noise should we make? the default is 2
 #
@@ -153,6 +161,9 @@ my $default_du_args				= '-csh';
 
 # set default for use_lazy_deletes
 my $use_lazy_deletes = 0;	# do not delete the oldest archive until after backup
+
+# set default for number of tries
+my $rsync_numtries = 1; # by default, try once
 
 # exactly how the program was called, with all arguments
 # this is set before getopts() modifies @ARGV
@@ -259,6 +270,14 @@ add_lockfile();
 # create snapshot_root if it doesn't exist (and no_create_root != 1)
 create_snapshot_root();
 
+# now chdir to the snapshot_root.
+# note that this is needed because in the rare case that you do this ...
+# sudo -u peon rsnapshot ... and are in a directory that 'peon' can't
+# read, then some versions of GNU rm will later fail, as they try to
+# lstat the cwd.  It's safe to chdir because all directories etc that
+# we ever mention are absolute.
+chdir($config_vars{'snapshot_root'});
+
 # actually run the backup job
 # $cmd should store the name of the interval we'll run against
 handle_interval( $cmd );
@@ -307,16 +326,16 @@ See the GNU General Public License for details.
 Options:
     -v verbose       - Show equivalent shell commands being executed.
     -t test          - Show verbose output, but don't touch anything.
-    -c [file]        - Specify alternate config file (-c /path/to/file)
                        This will be similar, but not always exactly the same
                        as the real output from a live run.
+    -c [file]        - Specify alternate config file (-c /path/to/file)
     -q quiet         - Suppress non-fatal warnings.
     -V extra verbose - The same as -v, but with more detail.
     -D debug         - A firehose of diagnostic information.
     -x one_fs        - Don't cross filesystems (same as -x option to rsync).
 
 Commands:
-    [interval]       - An interval as defined in rsnapshot.conf.
+    [backuplevel]    - A backup level as defined in rsnapshot.conf.
     configtest       - Syntax check the config file.
     sync [dest]      - Sync files, without rotating. "sync_first" must be
                        enabled for this to work. If a full backup point
@@ -324,7 +343,7 @@ Commands:
                        those files will be synced.
     diff             - Front-end interface to the rsnapshot-diff program.
                        Accepts two optional arguments which can be either
-                       filesystem paths or interval directories within the
+                       filesystem paths or backup directories within the
                        snapshot_root (e.g., /etc/ daily.0/etc/). The default
                        is to compare the two most recent snapshots.
     du               - Show disk usage in the snapshot_root.
@@ -350,6 +369,16 @@ sub show_version {
 sub show_version_only {
 	print "$VERSION\n";
 	exit(0);
+}
+
+# For Getopt::Std
+sub VERSION_MESSAGE {
+	show_version;
+}
+
+# For Getopt::Std
+sub HELP_MESSAGE {
+	show_help;
 }
 
 # accepts no arguments
@@ -470,14 +499,22 @@ sub parse_cmd_line_opts {
 sub parse_config_file {
 	# count the lines in the config file, so the user can pinpoint errors more precisely
 	my $file_line_num = 0;
+	my @configs = ();
 	
 	# open the config file
 	my $config_file = shift() || $config_file;
-	my $CONFIG = IO::File->new($config_file)
+	my $CONFIG;
+	if($config_file =~ /^`.*`$/) {
+	    open($CONFIG, "$config_file|") ||
+	        bail("Couldn't execute \"$config_file\" to get config information\nAre you sure you have permission?");
+	} else {
+	    $CONFIG = IO::File->new($config_file)
 		or bail("Could not open config file \"$config_file\"\nAre you sure you have permission?");
+        }
 	
 	# read it line by line
-	while (my $line = <$CONFIG>) {
+	@configs = <$CONFIG>;
+	while (my $line = $configs[$file_line_num]) {
 		chomp($line);
 		
 		# count line numbers
@@ -491,6 +528,13 @@ sub parse_config_file {
 		
 		# ignore blank lines
 		if (is_blank($line)) { next; }
+
+		# if the next line begins with space or tab it belongs to this line
+		while (defined ($configs[$file_line_num]) && $configs[$file_line_num] =~ /^(\t|\s)/) {
+			(my $newline = $configs[$file_line_num]) =~ s/^\s+|\s+$//g;
+			$line = $line . "\t" . $newline;
+			$file_line_num++;
+		}
 		
 		# parse line
 		my ($var, $value, $value2, $value3) = split(/\t+/, $line, 4);
@@ -513,10 +557,19 @@ sub parse_config_file {
 				next;
 			}
 		}
+		foreach (grep {
+		    defined($_) && index($_, ' ') == 0
+		} ($value, $value2, $value3)) {
+		    print_warn("$line - extra space found between tab and $_");
+		}
 		
 		# INCLUDEs
 		if($var eq 'include_conf') {
-			if(defined($value) && -f $value && -r $value) {
+			$value =~ /^`(.*)`$/;
+			if(
+			    (defined($value) && -f $value && -r $value) ||
+			    (defined($1) && -x $1)
+			) {
 				$line_syntax_ok = 1;
 				parse_config_file($value);
 			} else {
@@ -624,6 +677,7 @@ sub parse_config_file {
 		
 		# CHECK FOR RSYNC (required)
 		if ($var eq 'cmd_rsync') {
+                        $value =~ s/\s+$//;
 			if ((-f "$value") && (-x "$value") && (1 == is_real_local_abs_path($value))) {
 				$config_vars{'cmd_rsync'} = $value;
 				$line_syntax_ok = 1;
@@ -636,6 +690,7 @@ sub parse_config_file {
 		
 		# CHECK FOR SSH (optional)
 		if ($var eq 'cmd_ssh') {
+                        $value =~ s/\s+$//;
 			if ((-f "$value") && (-x "$value") && (1 == is_real_local_abs_path($value))) {
 				$config_vars{'cmd_ssh'} = $value;
 				$line_syntax_ok = 1;
@@ -648,6 +703,7 @@ sub parse_config_file {
 		
 		# CHECK FOR GNU cp (optional)
 		if ($var eq 'cmd_cp') {
+                        $value =~ s/\s+$//;
 			if ((-f "$value") && (-x "$value") && (1 == is_real_local_abs_path($value))) {
 				$config_vars{'cmd_cp'} = $value;
 				$line_syntax_ok = 1;
@@ -660,6 +716,7 @@ sub parse_config_file {
 		
 		# CHECK FOR rm (optional)
 		if ($var eq 'cmd_rm') {
+                        $value =~ s/\s+$//;
 			if ((-f "$value") && (-x "$value") && (1 == is_real_local_abs_path($value))) {
 				$config_vars{'cmd_rm'} = $value;
 				$line_syntax_ok = 1;
@@ -672,6 +729,7 @@ sub parse_config_file {
 		
 		# CHECK FOR LOGGER (syslog program) (optional)
 		if ($var eq 'cmd_logger') {
+                        $value =~ s/\s+$//;
 			if ((-f "$value") && (-x "$value") && (1 == is_real_local_abs_path($value))) {
 				$config_vars{'cmd_logger'} = $value;
 				$line_syntax_ok = 1;
@@ -684,6 +742,7 @@ sub parse_config_file {
 		
 		# CHECK FOR du (optional)
 		if ($var eq 'cmd_du') {
+                        $value =~ s/\s+$//;
 			if ((-f "$value") && (-x "$value") && (1 == is_real_local_abs_path($value))) {
 				$config_vars{'cmd_du'} = $value;
 				$line_syntax_ok = 1;
@@ -694,23 +753,62 @@ sub parse_config_file {
 			}
 		}
 		
+		# CHECK FOR lvcreate (optional)
+		if ($var eq 'linux_lvm_cmd_lvcreate') {
+			if ((-f "$value") && (-x "$value") && (1 == is_real_local_abs_path($value))) {
+				$config_vars{'linux_lvm_cmd_lvcreate'} = $value;
+				$line_syntax_ok = 1;
+				next;
+			} else {
+				config_err($file_line_num, "$line - $value is not executable");
+				next;
+			}
+		}
+		# CHECK FOR lvremove (optional)
+		if ($var eq 'linux_lvm_cmd_lvremove') {
+			if ((-f "$value") && (-x "$value") && (1 == is_real_local_abs_path($value))) {
+				$config_vars{'linux_lvm_cmd_lvremove'} = $value;
+				$line_syntax_ok = 1;
+				next;
+			} else {
+				config_err($file_line_num, "$line - $value is not executable");
+				next;
+			}
+		}
+		# CHECK FOR mount (optional)
+		if ($var eq 'linux_lvm_cmd_mount') {
+			if ((-f "$value") && (-x "$value") && (1 == is_real_local_abs_path($value))) {
+				$config_vars{'linux_lvm_cmd_mount'} = $value;
+				$line_syntax_ok = 1;
+				next;
+			} else {
+				config_err($file_line_num, "$line - $value is not executable");
+				next;
+			}
+		}
+		# CHECK FOR umount (optional)
+		if ($var eq 'linux_lvm_cmd_umount') {
+			if ((-f "$value") && (-x "$value") && (1 == is_real_local_abs_path($value))) {
+				$config_vars{'linux_lvm_cmd_umount'} = $value;
+				$line_syntax_ok = 1;
+				next;
+			} else {
+				config_err($file_line_num, "$line - $value is not executable");
+				next;
+			}
+		}
+		
 		# CHECK FOR cmd_preexec (optional)
 		if ($var eq 'cmd_preexec') {
-			my $full_script	= $value;	# backup script to run (including args)
-			my $script;					# script file (no args)
-			my @script_argv;			# all script arguments
-			
-			# get the base name of the script, not counting any arguments to it
-			@script_argv = split(/\s+/, $full_script);
-			$script = $script_argv[0];
+			my $script;			# script file (no args)
 			
 			# make sure script exists and is executable
-			if (((! -f "$script") or (! -x "$script")) or !is_real_local_abs_path($script)) {
-				config_err($file_line_num, "$line - cmd_preexec \"$script\" is not executable or does not exist");
+			if ( ! is_valid_script($value, \$script) ) {
+				config_err($file_line_num, "$line - \"$script\" is not executable or can't be found.".($script !~ m{^/} ? " Please use an absolute path.":""));
 				next;
 			}
 			
-			$config_vars{'cmd_preexec'} = $full_script;
+			$config_vars{$var} = $value;
 			
 			$line_syntax_ok = 1;
 			next;
@@ -718,21 +816,15 @@ sub parse_config_file {
 		
 		# CHECK FOR cmd_postexec (optional)
 		if ($var eq 'cmd_postexec') {
-			my $full_script	= $value;	# backup script to run (including args)
-			my $script;					# script file (no args)
-			my @script_argv;			# all script arguments
-			
-			# get the base name of the script, not counting any arguments to it
-			@script_argv = split(/\s+/, $full_script);
-			$script = $script_argv[0];
+			my $script;			# script file (no args)
 			
 			# make sure script exists and is executable
-			if (((! -f "$script") or (! -x "$script")) or !is_real_local_abs_path($script)) {
-				config_err($file_line_num, "$line - cmd_postexec \"$script\" is not executable or does not exist");
+			if ( ! is_valid_script($value, \$script) ) {
+				config_err($file_line_num, "$line - \"$script\" is not executable or can't be found.".($script !~ m{^/} ? " Please use an absolute path.":""));
 				next;
 			}
 			
-			$config_vars{'cmd_postexec'} = $full_script;
+			$config_vars{$var} = $value;
 			
 			$line_syntax_ok = 1;
 			next;
@@ -740,6 +832,7 @@ sub parse_config_file {
 		
 		# CHECK FOR rsnapshot-diff (optional)
 		if ($var eq 'cmd_rsnapshot_diff') {
+                        $value =~ s/\s+$//;
 			if ((-f "$value") && (-x "$value") && (1 == is_real_local_abs_path($value))) {
 				$config_vars{'cmd_rsnapshot_diff'} = $value;
 				$line_syntax_ok = 1;
@@ -751,14 +844,22 @@ sub parse_config_file {
 		}
 		
 		# INTERVALS
-		if ($var eq 'interval') {
+		# 'retain' is the new name for this parameter, although for
+		# Laziness reasons (plus the fact that I'm making this change
+		# at 10 minutes to midnight and so am wary of making changes
+		# throughout the code and getting it wrong) the code will
+		# still call it 'interval'.  Documentation and messages should
+		# refer to 'retain'.  The old 'interval' will be kept as an
+		# alias.
+		if ($var eq 'interval' || $var eq 'retain') {
+			my $retain = $var;	# either 'interval' or 'retain'
 			# check if interval is blank
-			if (!defined($value)) { config_err($file_line_num, "$line - Interval can not be blank"); }
+			if (!defined($value)) { config_err($file_line_num, "$line - $retain can not be blank"); }
 			
 			foreach my $word (@reserved_words) {
 				if ($value eq $word) {
 					config_err($file_line_num,
-						"$line - \"$value\" is not a valid interval, reserved word conflict");
+						"$line - \"$value\" is not a valid interval name, reserved word conflict");
 					next;
 				}
 			}
@@ -766,7 +867,7 @@ sub parse_config_file {
 			# make sure interval is alpha-numeric
 			if ($value !~ m/^[\w\d]+$/) {
 				config_err($file_line_num,
-					"$line - \"$value\" is not a valid interval, must be alphanumeric characters only");
+					"$line - \"$value\" is not a valid $retain name, must be alphanumeric characters only");
 				next;
 			}
 			
@@ -778,7 +879,7 @@ sub parse_config_file {
 			
 			# check if number is valid
 			if ($value2 !~ m/^\d+$/) {
-				config_err($file_line_num, "$line - \"$value2\" is not a legal value for an interval");
+				config_err($file_line_num, "$line - \"$value2\" is not a legal value for a retention count");
 				next;
 			# ok, it's a number. is it positive?
 			} else {
@@ -859,6 +960,43 @@ sub parse_config_file {
 			} elsif ( is_cwrsync_path($src) ) {
 				$line_syntax_ok = 1;
 				
+			# check for lvm
+			} elsif ( is_linux_lvm_path($src) ) {
+				# if it's an lvm path, make sure we have lvm commands and arguments
+				if (!defined($config_vars{'linux_lvm_cmd_lvcreate'})) {
+					config_err($file_line_num, "$line - Cannot handle $src, linux_lvm_cmd_lvcreate not defined in $config_file");
+					next;
+				}
+				if (!defined($config_vars{'linux_lvm_cmd_lvremove'})) {
+					config_err($file_line_num, "$line - Cannot handle $src, linux_lvm_cmd_lvremove not defined in $config_file");
+					next;
+				}
+				if (!defined($config_vars{'linux_lvm_cmd_mount'})) {
+					config_err($file_line_num, "$line - Cannot handle $src, linux_lvm_cmd_mount not defined in $config_file");
+					next;
+				}
+				if (!defined($config_vars{'linux_lvm_cmd_umount'})) {
+					config_err($file_line_num, "$line - Cannot handle $src, linux_lvm_cmd_umount not defined in $config_file");
+					next;
+				}
+				if (!defined($config_vars{'linux_lvm_snapshotsize'})) {
+					config_err($file_line_num, "$line - Cannot handle $src, linux_lvm_snapshotsize not defined in $config_file");
+					next;
+				}
+				if (!defined($config_vars{'linux_lvm_snapshotname'})) {
+					config_err($file_line_num, "$line - Cannot handle $src, linux_lvm_snapshotname not defined in $config_file");
+					next;
+				}
+				if (!defined($config_vars{'linux_lvm_vgpath'})) {
+					config_err($file_line_num, "$line - Cannot handle $src, linux_lvm_vgpath not defined in $config_file");
+					next;
+				}
+				if (!defined($config_vars{'linux_lvm_mountpath'})) {
+					config_err($file_line_num, "$line - Cannot handle $src, linux_lvm_mountpath not defined in $config_file");
+					next;
+				}
+				$line_syntax_ok = 1;
+
 			# fear the unknown
 			} else {
 				config_err($file_line_num, "$line - Source directory \"$src\" doesn't exist");
@@ -1023,7 +1161,7 @@ sub parse_config_file {
 			
 			# make sure script exists and is executable
 			if (((! -f "$script") or (! -x "$script")) or !is_real_local_abs_path($script)) {
-				config_err($file_line_num, "$line - Backup script \"$script\" is not executable or does not exist");
+				config_err($file_line_num, "$line - \"$script\" is not executable or can't be found.".($script !~ m{^/} ? " Please use an absolute path.":""));
 				next;
 			}
 			
@@ -1082,6 +1220,23 @@ sub parse_config_file {
 				next;
 			}
 			$config_vars{'lockfile'} = $value;
+			$line_syntax_ok = 1;
+			next;
+		}
+		#STOP_ON_STALE_LOCKFILE
+		if ($var eq 'stop_on_stale_lockfile') {
+			if (!defined($value)) {
+				config_err($file_line_num, "$line - stop_on_stale_lockfile can not be blank");
+				next;
+			}
+			if (!is_boolean($value)) {
+				config_err(
+					$file_line_num, "$line - \"$value\" is not a legal value for stop_on_stale_lockfile, must be 0 or 1 only"
+				);
+				next;
+			}
+
+			$stop_on_stale_lockfile = $value;
 			$line_syntax_ok = 1;
 			next;
 		}
@@ -1174,7 +1329,7 @@ sub parse_config_file {
 		# SSH ARGS
 		if ($var eq 'ssh_args') {
 			if (!defined($default_ssh_args) && defined($config_vars{'ssh_args'})) {
-				config_err($file_line_num, "$line - global ssh_args can only be set once, but is already set.  Perhaps you wanted to use a per-backup ssh_args instead.");
+				config_err($file_line_num, "$line - global ssh_args can only be set once, but is already set.  Perhaps you wanted to use a per-backup-point ssh_args instead.");
 				next;
 			} else {
 				$config_vars{'ssh_args'} = $value;
@@ -1188,6 +1343,18 @@ sub parse_config_file {
 			$line_syntax_ok = 1;
 			next;
 		}
+		# LVM CMDS
+		if ($var =~ m/^linux_lvm_cmd_(lvcreate|mount)$/) {
+			$config_vars{$var} = $value;
+			$line_syntax_ok = 1;
+			next;
+		}
+		# LVM ARGS
+		if ($var =~ m/^linux_lvm_(vgpath|snapshotname|snapshotsize|mountpath)$/) {
+			$config_vars{$var} = $value;
+			$line_syntax_ok = 1;
+			next;
+		}
 		# LOGFILE
 		if ($var eq 'logfile') {
 			if (0 == is_valid_local_abs_path($value)) {
@@ -1196,7 +1363,7 @@ sub parse_config_file {
 			} elsif (1 == is_directory_traversal($value)) {
 				config_err($file_line_num, "$line - Directory traversal attempted in $value");
 				next;
-			} elsif (( -e "$value" ) && ( ! -f "$value" )) {
+			} elsif (( -e "$value" ) && ( ! -f "$value" ) && ( ! -p "$value" ) ) {
 				config_err($file_line_num, "$line - logfile $value exists, but is not a file");
 				next;
 			} else {
@@ -1250,6 +1417,23 @@ sub parse_config_file {
 			$line_syntax_ok = 1;
 			next;
 		}
+		# RSYNC NUMBER OF TRIES
+		if ($var eq 'rsync_numtries') {
+			if (!defined($value)) {
+				config_err($file_line_num, "$line - rsync_numtries can not be blank");
+				next;
+			}
+			if (!is_valid_rsync_numtries($value)) {
+				config_err(
+					$file_line_num, "$line - \"$value\" is not a legal value for rsync_numtries, must be greater than or equal to 0"
+				);
+				next;
+			}
+		
+			$rsync_numtries = int($value);
+			$line_syntax_ok = 1;
+			next;
+               }
 				
 		# make sure we understood this line
 		# if not, warn the user, and prevent the program from executing
@@ -1337,8 +1521,8 @@ sub validate_config_file {
 	}
 	# make sure we have at least one interval
 	if (0 == scalar(@intervals)) {
-		print_err ("At least one interval must be set. rsnapshot can not continue.", 1);
-		syslog_err("At least one interval must be set. rsnapshot can not continue.");
+		print_err ("At least one backup level must be set. rsnapshot can not continue.", 1);
+		syslog_err("At least one backup level must be set. rsnapshot can not continue.");
 		exit(1);
 	}
 	# make sure we have at least one backup point
@@ -1356,8 +1540,8 @@ sub validate_config_file {
 	if (scalar(@intervals) > 1) {
 		if (defined($intervals[0]->{'number'})) {
 			if (1 == $intervals[0]->{'number'}) {
-				print_err ("Can not have first interval set to 1, and have a second interval", 1);
-				syslog_err("Can not have first interval set to 1, and have a second interval");
+				print_err ("Can not have first backup level's retention count set to 1, and have a second backup level", 1);
+				syslog_err("Can not have first backup level's retention count set to 1, and have a second backup level");
 				exit(1);
 			}
 		}
@@ -1541,6 +1725,10 @@ sub parse_backup_opts {
 		} elsif ( $name eq 'ssh_args' ) {
 			# pass unchecked
 			
+		# lvm args
+		} elsif ( $name =~ m/^linux_lvm_(vgpath|snapshotname|snapshotsize|mountpath)$/ ) {
+			# pass unchecked
+			
 		# include
 		} elsif ( $name eq 'include' ) {
 			# don't validate contents
@@ -1620,7 +1808,14 @@ sub parse_backup_opts {
 			}
 			
 			delete($parsed_opts{'exclude_file'});
-			
+
+		# Not (yet?) implemented as per-backup-point options
+		} elsif ( $name eq 'cmd_preexec' || $name eq 'cmd_postexec' 
+			|| $name eq 'cmd_ssh' || $name eq 'cmd_rsync'
+			|| $name eq 'verbose' || $name eq 'loglevel') {
+			print_err("$name is not implemented as a per-backup-point option in this version of rsnapshot", 2);
+			return (undef);
+
 		# if we don't know about it, it doesn't exist
 		} else {
 			return (undef);
@@ -1696,7 +1891,9 @@ sub bail {
 	}
 	
 	# get rid of the lockfile, if it exists
-	remove_lockfile();
+	if(0 == $stop_on_stale_lockfile) {
+	        remove_lockfile();
+	}
 	
 	# exit showing an error
 	exit(1);
@@ -2112,9 +2309,15 @@ sub add_lockfile {
                 syslog_err("Lockfile $lockfile exists and so does its process, can not continue");
                 exit(1);
             } else {
-                print_warn("Removing stale lockfile $lockfile", 1);
-                syslog_warn("Removing stale lockfile $lockfile");
-                remove_lockfile();
+		if(1 == $stop_on_stale_lockfile) {
+		    print_err ("Stale lockfile $lockfile detected. You need to remove it manually to continue", 1);
+		    syslog_err("Stale lockfile $lockfile detected. Exiting.");
+		    exit(1);
+	        } else {
+	            print_warn("Removing stale lockfile $lockfile", 1);
+		    syslog_warn("Removing stale lockfile $lockfile");
+		    remove_lockfile();
+	        }
             }
         }
 
@@ -2169,6 +2372,8 @@ sub remove_lockfile {
 				exit(1);
 			}
 		}
+	} else {
+		print_msg("No need to remove non-existent lock $lockfile", 5);
 	}
 	
 	return (1);
@@ -2398,6 +2603,19 @@ sub is_valid_loglevel {
 	return (0);
 }
 
+# accepts a positive number formatted as string
+# returns 1 if it's valid, 0 otherwise
+sub is_valid_rsync_numtries {
+	my $value   = shift(@_);
+	if (!defined($value)) { return (0); }
+
+	if ($value =~ m/^\d+$/) {
+		if (($value >= 0)) {
+			return (1);
+		}
+	}
+}
+
 # accepts one argument
 # checks to see if that argument is set to 1 or 0
 # returns 1 on success, 0 on failure
@@ -2472,6 +2690,18 @@ sub is_anon_rsync_path {
 	
 	if (!defined($path))			{ return (undef); }
 	if ($path =~ m/^rsync:\/\/.*$/)	{ return (1); }
+	
+	return (0);
+}
+
+# accepts path
+# returns 1 if it's a syntactically valid LVM path
+# returns 0 otherwise
+sub is_linux_lvm_path {
+	my $path = shift(@_);
+	
+	if (!defined($path))		{ return (undef); }
+	if ($path =~ m|^lvm://.*$|)	{ return (1); }
 	
 	return (0);
 }
@@ -2573,6 +2803,27 @@ sub is_directory {
 	return (0);
 }
 
+# accepts a string with a script file and optional arguments
+# returns 1 if it the script file exists, is executable and has absolute path.
+# returns 0 otherwise
+sub is_valid_script {
+	my $full_script	= shift(@_);	# script to run (including args)
+	my $script_ref	= shift(@_);	# reference to script file name
+	my $script;			# script file (no args)
+	my @script_argv;		# all script arguments
+	
+	# get the base name of the script, not counting any arguments to it
+	@script_argv = split(/\s+/, $full_script);
+	$script = $script_argv[0];
+	$$script_ref = $script;		# Output $script in case caller wants it
+	
+	# make sure script exists and is executable
+	if ( -f "$script" && -x "$script" && is_real_local_abs_path($script)) {
+		return 1;
+	}
+	return 0;
+}
+
 # accepts string
 # removes trailing slash, returns the string
 sub remove_trailing_slash {
@@ -2615,61 +2866,13 @@ sub handle_interval {
 	
 	my $result = 0;
 	
-	# make sure we don't have any leftover interval.delete directories
-	# if so, loop through and delete them
-	foreach my $interval_ref (@intervals) {
-		my $interval = $$interval_ref{'interval'};
-		
-		my $is_file = 0;
-		my $exists = 0;
-		
-		# double check that the node and snapshot_root are not the same directory
-		# it would be very bad to accidentally delete the snapshot root!
-		# first test for symlinks (should never be here)
-		if ( -l "$config_vars{'snapshot_root'}/$interval.delete" ) {
-			$exists = 1;
-			$is_file = 1;
-			
-		# file (should never be here)
-		} elsif ( -f "$config_vars{'snapshot_root'}/$interval.delete" ) {
-			$exists = 1;
-			$is_file = 1;
-			
-		# directory (this is what we're expecting)
-		} elsif ( -d "$config_vars{'snapshot_root'}/$interval.delete" ) {
-			$exists = 1;
-			$is_file = 0;
-			
-		# exists, but is something else
-		} elsif ( -e "$config_vars{'snapshot_root'}/$interval.delete" ) {
-			bail("Invalid file type for \"$config_vars{'snapshot_root'}/$interval.delete\" in handle_interval()\n");
-		}
-		
-		# we don't use if (-e $dir), because that fails for invalid symlinks
-		if (1 == $exists) {
-			# if we found any leftover directories, delete them now before they pile up and cause problems
-			# this is a directory
-			if (0 == $is_file) {
-				display_rm_rf("$config_vars{'snapshot_root'}/$interval.delete/");
-				if (0 == $test) {
-					$result = rm_rf( "$config_vars{'snapshot_root'}/$interval.delete/" );
-					if (0 == $result) {
-						bail("Error! rm_rf(\"$config_vars{'snapshot_root'}/$interval.delete/\")");
-					}		
-				}		
-				
-			# this is a file or symlink
-			} else {
-				print_cmd("rm -f $config_vars{'snapshot_root'}/$interval.delete");
-				if (0 == $test) {
-					$result = unlink("$config_vars{'snapshot_root'}/$interval.delete");
-					if (0 == $result) {
-						bail("Could not remove \"$config_vars{'snapshot_root'}/$interval.delete\" in handle_interval()");
-					}
-				}
-			}
-		}
-	}
+	# here we used to check for interval.delete directories.  This was
+	# removed when we switched to using _delete.$$ directories.  This
+	# was done so that you can run another (eg) rsnapshot hourly, while
+	# the .delete directory from the previous hourly backup was still
+	# going.  Potentially you may have several parallel deletes going on
+	# with the new scheme, but I'm pretty sure that you'll catch up
+	# eventually and not hopelessly wedge the machine -- DRC
 	
 	# handle toggling between sync_first being enabled and disabled
 	
@@ -2707,17 +2910,19 @@ sub handle_interval {
 			# create the sync root if it doesn't exist
 			if ( ! -d "$config_vars{'snapshot_root'}/.sync" ) {
 				
-				# cp_al() will create the directory for us
+				# If .sync does not exist but lowest.0 does, then copy that.
 				
 				# call generic cp_al() subroutine
 				my $interval_0	= "$config_vars{'snapshot_root'}/" . $intervals[0]->{'interval'} . ".0";
 				my $sync_dir	= "$config_vars{'snapshot_root'}/.sync";
 				
-				display_cp_al( "$interval_0", "$sync_dir" );
-				if (0 == $test) {
-					$result = cp_al( "$interval_0", "$sync_dir" );
-					if (! $result) {
-						bail("Error! cp_al(\"$interval_0\", \"$sync_dir\")");
+				if ( -d $interval_0 ) {
+					display_cp_al( "$interval_0", "$sync_dir" );
+					if (0 == $test) {
+						$result = cp_al( "$interval_0", "$sync_dir" );
+						if (! $result) {
+							bail("Error! cp_al(\"$interval_0\", \"$sync_dir\")");
+						}
 					}
 				}
 			}
@@ -2769,21 +2974,23 @@ sub handle_interval {
 		rotate_higher_interval( $id_ref );
 	}
 	
-	# if use_lazy_delete is on, delete the interval.delete directory
+	# if use_lazy_delete is on, delete the _delete.$$ directory
 	# we just check for the directory, it will have been created or not depending on the value of use_lazy_delete
-	if ( -d "$config_vars{'snapshot_root'}/$$id_ref{'interval'}.delete" ) {
+	if ( -d "$config_vars{'snapshot_root'}/_delete.$$" ) {
 		# this is the last thing to do here, and it can take quite a while.
 		# we remove the lockfile here since this delete shouldn't block other rsnapshot jobs from running
 		remove_lockfile();
 		
 		# start the delete
-		display_rm_rf("$config_vars{'snapshot_root'}/$$id_ref{'interval'}.delete/");
+		display_rm_rf("$config_vars{'snapshot_root'}/_delete.$$");
 		if (0 == $test) {
-			my $result = rm_rf( "$config_vars{'snapshot_root'}/$$id_ref{'interval'}.delete/" );
+			my $result = rm_rf( "$config_vars{'snapshot_root'}/_delete.$$" );
 			if (0 == $result) {
-				bail("Error! rm_rf(\"$config_vars{'snapshot_root'}/$$id_ref{'interval'}.delete/\")\n");
+				bail("Error! rm_rf(\"$config_vars{'snapshot_root'}/_delete.$$\")\n");
 			}
 		}
+	} else {
+		print_msg("No directory to delete: $config_vars{'snapshot_root'}/_delete.$$", 5);
 	}
 }
 
@@ -2901,22 +3108,22 @@ sub rotate_lowest_snapshots {
 	
 	# remove oldest directory
 	if ( (-d "$config_vars{'snapshot_root'}/$interval.$interval_max") && ($interval_max > 0) ) {
-		# if use_lazy_deletes is set move the oldest directory to interval.delete
+		# if use_lazy_deletes is set move the oldest directory to _delete.$$
 		if (1 == $use_lazy_deletes) {
 			print_cmd("mv",
 				"$config_vars{'snapshot_root'}/$interval.$interval_max/",
-				"$config_vars{'snapshot_root'}/$interval.delete/"
+				"$config_vars{'snapshot_root'}/_delete.$$/"
 			);
 			
 			if (0 == $test) {
 				my $result = safe_rename(
 					"$config_vars{'snapshot_root'}/$interval.$interval_max",
-					"$config_vars{'snapshot_root'}/$interval.delete"
+					"$config_vars{'snapshot_root'}/_delete.$$"
 				);
 				if (0 == $result) {
 					my $errstr = '';
 					$errstr .= "Error! safe_rename(\"$config_vars{'snapshot_root'}/$interval.$interval_max/\", \"";
-					$errstr .= "$config_vars{'snapshot_root'}/$interval.delete/\")";
+					$errstr .= "$config_vars{'snapshot_root'}/_delete.$$/\")";
 					bail($errstr);
 				}				
 			}				
@@ -2936,6 +3143,8 @@ sub rotate_lowest_snapshots {
 	
 	# rotate the middle ones
 	if ($interval_max > 0) {
+		# Have we rotated a directory for this interval?
+		my $dir_rotated = 0;
 		for (my $i=($interval_max-1); $i>0; $i--) {
 			if ( -d "$config_vars{'snapshot_root'}/$interval.$i" ) {
 				print_cmd("mv",
@@ -2955,6 +3164,11 @@ sub rotate_lowest_snapshots {
 						bail($errstr);
 					}
 				}
+				$dir_rotated = 1;
+			} elsif ($dir_rotated) {
+				# We have rotated a directory for this interval, but $i
+				# does not exist - that probably means a hole.
+				print_msg("Note: $config_vars{'snapshot_root'}/$interval.$i missing, cannot rotate it", 4);
 			}
 		}
 	}
@@ -3094,6 +3308,10 @@ sub rsync_backup_point {
 	my $result					= undef;
 	my $using_relative			= 0;
 	
+	my $linux_lvm                     = 0;
+	my $linux_lvm_oldpwd              = undef;
+	my $linux_lvm_snapshotname        = undef;
+
 	if (defined($$bp_ref{'src'})) {
 		$src = remove_trailing_slash( "$$bp_ref{'src'}" );
 		$src = add_slashdot_if_root( "$src" );
@@ -3234,7 +3452,7 @@ sub rsync_backup_point {
 		
 		# if we have any args for SSH, add them
 		if ( defined($ssh_args) ) {
-			push( @rsync_long_args_stack, "--rsh=$config_vars{'cmd_ssh'} $ssh_args" );
+			push( @rsync_long_args_stack, "--rsh=\"$config_vars{'cmd_ssh'} $ssh_args\"" );
 			
 		# no arguments is the default
 		} else {
@@ -3243,13 +3461,92 @@ sub rsync_backup_point {
 		
 	# anonymous rsync
 	} elsif ( is_anon_rsync_path($$bp_ref{'src'}) ) {
-		# make rsync quiet if we're not running EXTRA verbose
-		if ($verbose < 4) { $rsync_short_args .= 'q'; }
+		# make rsync quiet if we're running in quiet mode
+		if ($verbose < 2) { $rsync_short_args .= 'q'; }
 		
 	# cwrsync path
 	} elsif ( is_cwrsync_path($$bp_ref{'src'}) ) {
-		# make rsync quiet if we're not running EXTRA verbose
-		if ($verbose < 4) { $rsync_short_args .= 'q'; }
+		# make rsync quiet if we're running in quiet mode
+		if ($verbose < 2) { $rsync_short_args .= 'q'; }
+		
+	# LVM path
+	} elsif ( is_linux_lvm_path($$bp_ref{'src'}) ) {
+		# take LVM snapshot and mount, reformat src into local path
+
+        unless (defined($config_vars{'linux_lvm_snapshotsize'})) {
+            bail("Missing required argument for LVM source: linux_lvm_snapshotsize");
+        }
+        unless (defined($config_vars{'linux_lvm_snapshotname'})) {
+            bail("Missing required argument for LVM source: linux_lvm_snapshotname");
+        }
+        unless (defined($config_vars{'linux_lvm_vgpath'})) {
+            bail("Missing required argument for LVM source: linux_lvm_vgpath");
+        }
+        unless (defined($config_vars{'linux_lvm_mountpath'})) {
+            bail("Missing required argument for LVM source: linux_lvm_mountpath");
+        }
+
+        # parse LVM src ('lvm://vgname/volname/path')
+        my ($linux_lvmvgname,$linux_lvmvolname, $linux_lvmpath) = ($$bp_ref{'src'} =~ m|^lvm://([^/]+)/([^/]+)/(.*)$|);
+        # lvmvolname and/or path could be the string "0", so test for 'defined':
+        unless (defined($linux_lvmvgname) and defined($linux_lvmvolname) and defined($linux_lvmpath)) {
+            bail("Could not understand LVM source \"$$bp_ref{'src'}\" in backup_lowest_interval()");
+        }
+        
+        # assemble and execute LVM snapshot command
+        @cmd_stack = ();
+        push(@cmd_stack, $config_vars{'linux_lvm_cmd_lvcreate'});
+        push(@cmd_stack, '--snapshot');
+
+        push(@cmd_stack, '--size');
+        push(@cmd_stack, $config_vars{'linux_lvm_snapshotsize'});
+        push(@cmd_stack, '--name');
+        push(@cmd_stack, $config_vars{'linux_lvm_snapshotname'});
+
+        push(@cmd_stack, join('/', $config_vars{'linux_lvm_vgpath'}, $linux_lvmvgname, $linux_lvmvolname));
+        
+        print_cmd(@cmd_stack);
+        if (0 == $test) {
+            # silence gratuitous lvcreate output
+            #$result = system(@cmd_stack);
+            $result = system(join " ", @cmd_stack, ">/dev/null");
+            
+            if ($result != 0) {
+                bail("Create LVM snapshot failed: $result");
+            }
+        }
+        
+        # mount the snapshot
+        @cmd_stack = ();
+        push(@cmd_stack, $config_vars{'linux_lvm_cmd_mount'});
+
+        $linux_lvm_snapshotname = join('/', $config_vars{'linux_lvm_vgpath'}, $linux_lvmvgname, $config_vars{'linux_lvm_snapshotname'});
+        push(@cmd_stack, $linux_lvm_snapshotname);
+        push(@cmd_stack, $config_vars{'linux_lvm_mountpath'});
+        
+        print_cmd(@cmd_stack);
+        if (0 == $test) {
+            $result = system(@cmd_stack);
+            
+            if ($result != 0) {
+                bail("Mount LVM snapshot failed: $result");
+            }
+        }
+        
+        
+        # rewrite src to point to mount path
+        # - to avoid including the mountpath in the snapshot, change the working directory and use a relative source
+        $linux_lvm_oldpwd = $ENV{PWD};
+        print_cmd("chdir($config_vars{'linux_lvm_mountpath'})");
+        if (0 == $test) {
+            $result = chdir($config_vars{'linux_lvm_mountpath'});
+            if (0 == $result) {
+            bail("Could not change directory to \"$config_vars{'linux_lvm_mountpath'}\"");
+            }
+        }
+
+        $$bp_ref{'src'} = './' .  $linux_lvmpath;
+        $linux_lvm = 1;
 		
 	# this should have already been validated once, but better safe than sorry
 	} else {
@@ -3266,7 +3563,7 @@ sub rsync_backup_point {
 			if ( -d "$config_vars{'snapshot_root'}/$interval_link_dest.$interval_num_link_dest/$$bp_ref{'dest'}" ) {
 				
 				# we don't use link_dest if we already synced once to this directory
-				if ($sync_dir_was_present) {
+				if (0 && $sync_dir_was_present) { # always false
 					
 					# skip --link-dest, this is the second time the sync has been run, because the .sync directory already exists
 					
@@ -3390,9 +3687,16 @@ sub rsync_backup_point {
 	# RUN THE RSYNC COMMAND FOR THIS BACKUP POINT BASED ON THE @cmd_stack VARS
 	print_cmd(@cmd_stack);
 	
+
+	my $tryCount = 0;
+	$result = 1;
 	if (0 == $test) {
-		$result = system(@cmd_stack);
-		
+		while ($tryCount < $rsync_numtries && $result !=0) {
+			# join is Michael Ashley's fix for some filter/space problems		
+			$result = system(join(' ', @cmd_stack));
+			$tryCount += 1;
+		}
+
 		# now we see if rsync ran successfully, and what to do about it
 		if ($result != 0) {
 			# bitmask return value
@@ -3401,8 +3705,53 @@ sub rsync_backup_point {
 			# print warnings, and set this backup point to rollback if we're using --link-dest
 			#
 			handle_rsync_error($retval, $bp_ref);
+		} else {
+			print_msg("rsync succeeded", 5);
 		}
 	}
+	
+	# unmount and drop snapshot if required
+	if ($linux_lvm) {
+	
+        print_cmd("chdir($linux_lvm_oldpwd)");
+        if (0 == $test) {
+            $result = chdir($linux_lvm_oldpwd);
+            if (0 == $result) {
+            bail("Could not change directory to \"$linux_lvm_oldpwd\"");
+            }
+        }
+
+        @cmd_stack = ();
+        push(@cmd_stack, $config_vars{'linux_lvm_cmd_umount'});
+
+        push(@cmd_stack, $config_vars{'linux_lvm_mountpath'});
+        
+        print_cmd(@cmd_stack);
+        if (0 == $test) {
+            # silence gratuitous lvremove output
+            #$result = system(@cmd_stack);
+            $result = system(join " ", @cmd_stack, ">/dev/null");
+            
+            if ($result != 0) {
+                bail("Unmount LVM snapshot failed: $result");
+            }
+        }
+
+        @cmd_stack = ();
+        push(@cmd_stack, $config_vars{'linux_lvm_cmd_lvremove'});
+
+        push(@cmd_stack, '--force');
+        push(@cmd_stack, $linux_lvm_snapshotname);
+        
+        print_cmd(@cmd_stack);
+        if (0 == $test) {
+            $result = system(@cmd_stack);
+            
+            if ($result != 0) {
+                bail("Removal of LVM snapshot failed: $result");
+            }
+        }
+    }
 }
 
 # accepts the name of the argument to split, and its value
@@ -3449,8 +3798,9 @@ sub handle_rsync_error {
 	my $bp_ref	= shift(@_);
 	
 	# shouldn't ever happen
-	if (!defined($retval)) { bail('retval undefined in warn_rsync_error()'); }
-	if (!defined($bp_ref)) { bail('bp_ref undefined in warn_rsync_error()'); }
+	if (!defined($retval)) { bail('retval undefined in handle_rsync_error()'); }
+	if (0 == $retval) { bail('retval == 0 in handle_rsync_error()'); }
+	if (!defined($bp_ref)) { bail('bp_ref undefined in handle_rsync_error()'); }
 	
 	# a partial list of rsync exit values (from the rsync 2.6.0 man page)
 	#
@@ -3815,7 +4165,7 @@ sub rollback_failed_backups {
 	# rollback failed backups (if we're using link_dest)
 	foreach my $rollback_point (@rollback_points) {
 		# make sure there's something to rollback from
-		if ( ! -e "$config_vars{'snapshot_root'}/$interval.1/$rollback_point" ) {
+		if ( ! -e "$config_vars{'snapshot_root'}/$interval_src/$rollback_point" ) {
 			next;
 		}
 	
@@ -3915,23 +4265,23 @@ sub rotate_higher_interval {
 	#
 	# delete the oldest one (if we're keeping more than one)
 	if ( -d "$config_vars{'snapshot_root'}/$interval.$interval_max" ) {
-		# if use_lazy_deletes is set move the oldest directory to interval.delete
+		# if use_lazy_deletes is set move the oldest directory to _delete.$$
 		# otherwise preform the default behavior
 		if (1 == $use_lazy_deletes) {
 			print_cmd("mv ",
 				"$config_vars{'snapshot_root'}/$interval.$interval_max/ ",
-				"$config_vars{'snapshot_root'}/$interval.delete/"
+				"$config_vars{'snapshot_root'}/_delete.$$/"
 			);
 			
 			if (0 == $test) {
 				my $result = safe_rename(
 					"$config_vars{'snapshot_root'}/$interval.$interval_max",
-					("$config_vars{'snapshot_root'}/$interval.delete")
+					("$config_vars{'snapshot_root'}/_delete.$$")
 				);
 				if (0 == $result) {
 					my $errstr = '';
 					$errstr .= "Error! safe_rename(\"$config_vars{'snapshot_root'}/$interval.$interval_max/\", \"";
-					$errstr .= "$config_vars{'snapshot_root'}/$interval.delete/\")";
+					$errstr .= "$config_vars{'snapshot_root'}/_delete.$$/\")";
 					bail($errstr);
 				}				
 			}				
@@ -4320,6 +4670,17 @@ sub rsync_cleanup_after_native_cp_al {
 	my $dest	= shift(@_);
 	
 	my $local_rsync_short_args = '-a';
+        # if the user asked for -E, we should use it here too.
+        # should we check for OS X?  Dunno, but for now that extra
+        # check is in here as we know we need it there, and so
+        # this is the smallest change for the smallest number of
+        # people
+        $local_rsync_short_args .= 'E' if(
+             defined($config_vars{'rsync_short_args'}) &&
+             $config_vars{'rsync_short_args'} =~ /E/ &&
+             $^O eq 'darwin'
+        );
+
 	my @cmd_stack = ();
 	
 	# make sure we were passed two arguments
@@ -4367,7 +4728,8 @@ sub rsync_cleanup_after_native_cp_al {
 	print_cmd(@cmd_stack);
 	
 	if (0 == $test) {
-		my $result = system(@cmd_stack);
+                # join is Michael Ashley's fix for some filter/space problems
+		my $result = system(join(' ', @cmd_stack));
 		
 		if ($result != 0) {
 			# bitmask return value
@@ -4595,7 +4957,7 @@ sub show_rsnapshot_diff {
 	
 	# see if we even got the right number of arguments (none is OK, but 1 isn't. 2 is also OK)
 	if (defined($ARGV[1]) && !defined($ARGV[2])) {
-		print STDERR "Usage: rsnapshot diff [interval|dir] [interval|dir]\n";
+		print STDERR "Usage: rsnapshot diff [backup level|dir] [backup level|dir]\n";
 		exit(1);
 	}
 	
@@ -4653,7 +5015,7 @@ sub show_rsnapshot_diff {
 	
 	# double check to make sure the directories exists (and are directories)
 	if ( (!defined($cmd_args[0]) or (!defined($cmd_args[1]))) or ((! -d "$cmd_args[0]") or (! -d "$cmd_args[1]")) ) {
-		print STDERR "ERROR: Arguments must be valid intervals or directories\n";
+		print STDERR "ERROR: Arguments must be valid backup levels or directories\n";
 		exit(1);
 	}
 	
@@ -5765,6 +6127,12 @@ It is recommended that you copy B</etc/rsnapshot.conf.default> to
 B</etc/rsnapshot.conf>, and then modify B</etc/rsnapshot.conf> to suit
 your needs.
 
+Long lines may be split over several lines.  "Continuation" lines
+B<must> begin with a space or a tab character.  Continuation lines will
+have all leading and trailing whitespace stripped off, and then be appended
+with an intervening tab character to the previous line when the configuation
+file is parsed.
+
 Here is a list of allowed parameters:
 
 =over 4
@@ -5780,7 +6148,10 @@ B<include_conf>       Include another file in the configuration at this point.
 This is recursive, but you may need to be careful about paths when specifying
 which file to include.  We check to see if the file you have specified is
 readable, and will yell an error if it isn't.  We recommend using a full
-path.
+path.  As a special case, include_conf's value may be enclosed in `backticks`
+in which case it will be executed and whatever it spits to STDOUT will
+be included in the configuration.  Note that shell meta-characters may be
+interpreted.
 
 =back
 
@@ -5835,16 +6206,35 @@ rotations).
 
 =back
 
-B<interval>           [name]   [number]
+B<linux_lvm_cmd_lvcreate>
+
+B<linux_lvm_cmd_lvremove>
+
+B<linux_lvm_cmd_mount>
+
+B<linux_lvm_cmd_umount>
 
 =over 4
 
-"name" refers to the name of this interval (e.g., hourly, daily). "number"
-is the number of snapshots for this type of interval that will be stored.
+Paths to lvcreate, lvremove, mount and umount commands, for use with Linux
+LVMs.  The lvcreate, lvremove, mount and umount commands are required for
+managing snapshots of LVM volumes and are otherwise optional.
+
+=back
+
+B<retain>             [name]   [number]
+
+=over 4
+
+"name" refers to the name of this backup level (e.g., hourly, daily,
+so also called the 'interval'). "number"
+is the number of snapshots for this type of interval that will be retained.
 The value of "name" will be the command passed to B<rsnapshot> to perform
 this type of backup.
 
-Example: B<interval hourly 6>
+A deprecated alias for 'retain' is 'interval'.
+
+Example: B<retain hourly 6>
 
 [root@localhost]# B<rsnapshot hourly>
 
@@ -5860,21 +6250,21 @@ using hard links.
 Each backup point (explained below) will then be rsynced to the
 corresponding directories in <snapshot_root>/hourly.0/
 
-Intervals must be specified in the config file in order, from most
+Backup levels must be specified in the config file in order, from most
 frequent to least frequent. The first entry is the one which will be
-synced with the backup points. The subsequent intervals (e.g., daily,
-weekly, etc) simply rotate, with each higher interval pulling from the
+synced with the backup points. The subsequent backup levels (e.g., daily,
+weekly, etc) simply rotate, with each higher backup level pulling from the
 one below it for its .0 directory.
 
 Example:
 
 =over 4
 
-B<interval  hourly 6>
+B<retain  hourly 6>
 
-B<interval  daily  7>
+B<retain  daily  7>
 
-B<interval  weekly 4>
+B<retain  weekly 4>
 
 =back
 
@@ -5900,13 +6290,13 @@ B<sync_first          1>
 =over 4
 
 sync_first changes the behaviour of rsnapshot. When this is enabled, all calls
-to rsnapshot with various intervals simply rotate files. All backups are handled
+to rsnapshot with various backup levels simply rotate files. All backups are handled
 by calling rsnapshot with the "sync" argument. The synced files are stored in
 a ".sync" directory under the snapshot_root.
 
 This allows better recovery in the event that rsnapshot is interrupted in the
 middle of a sync operation, since the sync step and rotation steps are
-seperated. This also means that you can easily run "rsnapshot sync" on the
+separated. This also means that you can easily run "rsnapshot sync" on the
 command line without fear of forcing all the other directories to rotate up.
 This benefit comes at the cost of one more snapshot worth of disk space.
 The default is 0 (off).
@@ -5996,6 +6386,12 @@ List of short arguments to pass to rsync. If not specified,
 "-a" is the default. Please note that these must be all next to each other.
 For example, "-az" is valid, while "-a -z" is not.
 
+"-a" is rsync's "archive mode" which tells it to copy as much of the
+filesystem metadata as it can for each file.  This specifically does *not*
+include information about hard links, as that would greatly increase rsync's
+memory usage and slow it down.  If you need to preserve hard links in your
+backups, then add "H" to this.
+
 =back
 
 B<rsync_long_args     --delete --numeric-ids --relative --delete-excluded>
@@ -6046,6 +6442,8 @@ features.
 
 B<lockfile    /var/run/rsnapshot.pid>
 
+B<stop_on_stale_lockfile	0>
+
 =over 4
 
 Lockfile to use when rsnapshot is run. This prevents a second invocation
@@ -6057,7 +6455,10 @@ If a lockfile exists when rsnapshot starts, it will try to read the file
 and stop with an error if it can't.  If it *can* read the file, it sees if
 a process exists with the PID noted in the file.  If it does, rsnapshot
 stops with an error message.  If there is no process with that PID, then
-we assume that the lockfile is stale and ignore it.
+we assume that the lockfile is stale and ignore it *unless*
+stop_on_stale_lockfile is set to 1 in which case we stop.
+
+stop_on_stale_lockfile defaults to 0.
 
 =back
 
@@ -6076,16 +6477,55 @@ B<use_lazy_deletes    1>
 =over 4
 
 Changes default behavior of rsnapshot and does not initially remove the 
-oldest snapshot. Instead it moves that directory to "interval".delete, and 
+oldest snapshot. Instead it moves that directory to _delete.[processid] and
 continues as normal. Once the backup has been completed, the lockfile will
 be removed before rsnapshot starts deleting the directory.
 
 Enabling this means that snapshots get taken sooner (since the delete doesn't
 come first), and any other rsnapshot processes are allowed to start while the
-final delete is happening. This benefit comes at the cost of one more
-snapshot worth of disk space. The default is 0 (off).
+final delete is happening. This benefit comes at the cost of using more
+disk space. The default is 0 (off).
+
+The details of how this works have changed in rsnapshot version 1.3.1.
+Originally you could only ever have one .delete directory per backup level.
+Now you can have many, so if your next (eg) hourly backup kicks off while the
+previous one is still doing a lazy delete you may temporarily have extra
+_delete directories hanging around.
 
 =back
+
+B<linux_lvm_snapshotsize    2G>
+
+=over 4
+
+LVM snapshot(s) size (lvcreate --size option).
+
+=back
+
+B<linux_lvm_snapshotname  rsnapshot>
+
+=over 4
+
+Name to be used when creating the LVM logical volume snapshot(s) (lvcreate --name option).
+
+=back
+
+B<linux_lvm_vgpath		/dev>
+
+=over 4
+
+Path to the LVM Volume Groups.
+
+=back
+
+B<linux_lvm_mountpath		/mnt/lvm-snapshot>
+
+=over 4
+
+Mount point to use to temporarily mount the snapshot(s). 
+
+=back
+
 
 B<UPGRADE NOTICE:>
 
@@ -6105,6 +6545,8 @@ B<backup>  rsync://example.com/path2/  example.com/
 
 B<backup>  /var/                       localhost/      one_fs=1
 
+B<backup>  lvm://vg0/home/path2/       lvm-vg0/
+
 B<backup_script>   /usr/local/bin/backup_pgsql.sh    pgsql_backup/
 
 =over 4
@@ -6115,7 +6557,7 @@ B<backup   /etc/        localhost/>
 
 =over 4
 
-Backs up /etc/ to <snapshot_root>/<interval>.0/localhost/etc/ using rsync on
+Backs up /etc/ to <snapshot_root>/<retain>.0/localhost/etc/ using rsync on
 the local filesystem
 
 =back
@@ -6124,7 +6566,7 @@ B<backup   /usr/local/  localhost/>
 
 =over 4
 
-Backs up /usr/local/ to <snapshot_root>/<interval>.0/localhost/usr/local/
+Backs up /usr/local/ to <snapshot_root>/<retain>.0/localhost/usr/local/
 using rsync on the local filesystem
 
 =back
@@ -6133,7 +6575,7 @@ B<backup   root@example.com:/etc/       example.com/>
 
 =over 4
 
-Backs up root@example.com:/etc/ to <snapshot_root>/<interval>.0/example.com/etc/
+Backs up root@example.com:/etc/ to <snapshot_root>/<retain>.0/example.com/etc/
 using rsync over ssh
 
 =back
@@ -6143,7 +6585,7 @@ B<backup   root@example.com:/usr/local/ example.com/>
 =over 4
 
 Backs up root@example.com:/usr/local/ to
-<snapshot_root>/<interval>.0/example.com/usr/local/ using rsync over ssh
+<snapshot_root>/<retain>.0/example.com/usr/local/ using rsync over ssh
 
 =back
 
@@ -6151,7 +6593,7 @@ B<backup   rsync://example.com/pub/      example.com/pub/>
 
 =over 4
 
-Backs up rsync://example.com/pub/ to <snapshot_root>/<interval>.0/example.com/pub/
+Backs up rsync://example.com/pub/ to <snapshot_root>/<retain>.0/example.com/pub/
 using an anonymous rsync server. Please note that unlike backing up local paths
 and using rsync over ssh, rsync servers have "modules", which are top level
 directories that are exported. Therefore, the module should also be specified in
@@ -6164,11 +6606,30 @@ B<backup   /var/     localhost/   one_fs=1>
 
 =over 4
 
-This is the same as the other examples, but notice how the fourth parameter
-is passed. This sets this backup point to not span filesystem partitions.
-If the global one_fs has been set, this will override it locally.
+This is the same as the other examples, but notice the fourth column.
+This is how you specify per-backup-point options to over-ride global
+settings.  This extra parameter can take several options, separated
+by B<commas>.
+
+It is most useful when specifying per-backup rsync excludes thus:
+
+B<backup  root@somehost:/  somehost   +rsync_long_args=--exclude=/var/spool/>
+
+Note the + sign.  That tells rsnapshot to I<add> to the list of arguments
+to pass to rsync instead of replacing the list.
 
 =back
+
+B<backup  lvm://vg0/home/path2/       lvm-vg0/>
+
+=over 4
+
+Backs up the LVM logical volume called home, of volume group vg0, to 
+<snapshot_root>/<interval>.0/lvm-vg0/. Will create, mount, backup, unmount and remove an LVM 
+snapshot for each lvm:// entry.
+
+=back
+
 
 B<backup_script      /usr/local/bin/backup_database.sh   db_backup/>
 
@@ -6195,7 +6656,7 @@ chmod u=r,go= mydatabase.sql	# r-------- (0400)
 =back
 
 rsnapshot will take the generated "mydatabase.sql" file and move it into the
-<snapshot_root>/<interval>.0/db_backup/ directory. On subsequent runs,
+<snapshot_root>/<retain>.0/db_backup/ directory. On subsequent runs,
 rsnapshot checks the differences between the files created against the
 previous files. If the backup script generates the same output on the next
 run, the files will be hard linked against the previous ones, and no
@@ -6221,26 +6682,37 @@ Putting it all together (an example file):
 
     snapshot_root   /.snapshots/
 
-    cmd_rsync       /usr/bin/rsync
-    cmd_ssh         /usr/bin/ssh
-    #cmd_cp         /bin/cp
-    cmd_rm          /bin/rm
-    cmd_logger      /usr/bin/logger
-    cmd_du          /usr/bin/du
+    cmd_rsync           /usr/bin/rsync
+    cmd_ssh             /usr/bin/ssh
+    #cmd_cp             /bin/cp
+    cmd_rm              /bin/rm
+    cmd_logger          /usr/bin/logger
+    cmd_du              /usr/bin/du
 
-    interval        hourly  6
-    interval        daily   7
-    interval        weekly  7
-    interval        monthly 3
+    linux_lvm_cmd_lvcreate        /sbin/lvcreate
+    linux_lvm_cmd_lvremove        /sbin/lvremove
+    linux_lvm_cmd_mount           /bin/mount
+    linux_lvm_cmd_umount          /bin/umount
 
-    backup          /etc/                     localhost/
-    backup          /home/                    localhost/
-    backup_script   /usr/local/bin/backup_mysql.sh  mysql_backup/
+    linux_lvm_snapshotsize    2G
+    linux_lvm_snapshotname    rsnapshot
+    linux_lvm_vgpath          /dev
+    linux_lvm_mountpath       /mnt/lvm-snapshot
 
-    backup          root@foo.com:/etc/        foo.com/
-    backup          root@foo.com:/home/       foo.com/
-    backup          root@mail.foo.com:/home/  mail.foo.com/
-    backup          rsync://example.com/pub/  example.com/pub/
+    retain              hourly  6
+    retain              daily   7
+    retain              weekly  7
+    retain              monthly 3
+
+    backup              /etc/                     localhost/
+    backup              /home/                    localhost/
+    backup_script       /usr/local/bin/backup_mysql.sh  mysql_backup/
+
+    backup              root@foo.com:/etc/        foo.com/
+    backup              root@foo.com:/home/       foo.com/
+    backup              root@mail.foo.com:/home/  mail.foo.com/
+    backup              rsync://example.com/pub/  example.com/pub/
+    backup              lvm://vg0/xen-home/       lvm-vg0/xen-home/
 
 =back
 
@@ -6256,7 +6728,7 @@ When you are first setting up your backups, you will probably
 also want to run it from the command line once or twice to get
 a feel for what it's doing.
 
-Here is an example crontab entry, assuming that intervals B<hourly>,
+Here is an example crontab entry, assuming that backup levels B<hourly>,
 B<daily>, B<weekly> and B<monthly> have been defined in B</etc/rsnapshot.conf>
 
 =over 4
@@ -6285,23 +6757,23 @@ This example will do the following:
 
 =back
 
-It is usually a good idea to schedule the larger intervals to run a bit before the
+It is usually a good idea to schedule the larger backup levels to run a bit before the
 lower ones. For example, in the crontab above, notice that "daily" runs 10 minutes
 before "hourly".  The main reason for this is that the daily rotate will
 pull out the oldest hourly and make that the youngest daily (which means
 that the next hourly rotate will not need to delete the oldest hourly),
 which is more efficient.  A secondary reason is that it is harder to
-predict how long the lowest interval will take, since it needs to actually
-do an rsync of the source as well as the rotate that all intervals do.
+predict how long the lowest backup level will take, since it needs to actually
+do an rsync of the source as well as the rotate that all backups do.
 
 If rsnapshot takes longer than 10 minutes to do the "daily" rotate
 (which usually includes deleting the oldest daily snapshot), then you
-should increase the time between the intervals.
+should increase the time between the backup levels.
 Otherwise (assuming you have set the B<lockfile> parameter, as is recommended)
 your hourly snapshot will fail sometimes because the daily still has the lock.  
 
 Remember that these are just the times that the program runs.
-To set the number of backups stored, set the B<interval> numbers in
+To set the number of backups stored, set the B<retain> numbers in
 B</etc/rsnapshot.conf>
 
 To check the disk space used by rsnapshot, you can call it with the "du" argument.
@@ -6334,7 +6806,7 @@ not support the -h flag (use -k instead, to see the totals in kilobytes). Other
 versions of "du", such as Solaris, may not work at all.
 
 To check the differences between two directories, call rsnapshot with the "diff"
-argument, followed by two intervals or directory paths.
+argument, followed by two backup levels or directory paths.
 
 For example:
 
@@ -6357,7 +6829,7 @@ B<rsnapshot sync>
 
 When B<sync_first> is enabled, rsnapshot must first be called with the B<sync>
 argument, followed by the other usual cron entries. The sync should happen as
-the lowest, most frequent interval, and right before. For example:
+the lowest, most frequent backup level, and right before. For example:
 
 =over 4
 
@@ -6372,7 +6844,7 @@ B<30 23 1 * *         /usr/local/bin/rsnapshot monthly>
 =back
 
 The sync operation simply runs rsync and all backup scripts. In this scenario, all
-interval calls simply rotate directories, even the lowest interval.
+calls simply rotate directories, even the lowest backup level.
 
 =back
 
@@ -6515,10 +6987,10 @@ If you remove backup points in the config file, the previously archived
 files under those points will permanently stay in the snapshots directory
 unless you remove the files yourself. If you want to conserve disk space,
 you will need to go into the <snapshot_root> directory and manually
-remove the files from the smallest interval's ".0" directory.
+remove the files from the smallest backup level's ".0" directory.
 
 For example, if you were previously backing up /home/ with a destination
-of localhost/, and hourly is your smallest interval, you would need to do
+of localhost/, and hourly is your smallest backup level, you would need to do
 the following to reclaim that disk space:
 
 =over 4
@@ -6561,6 +7033,10 @@ Current co-maintainer of rsnapshot
 
 =item -
 Wrote the rsnapshot-diff utility
+
+=item -
+Improved how use_lazy_deletes work so slow deletes don't screw up the next
+backup at that backup level.
 
 =back
 
@@ -6738,14 +7214,39 @@ Bug fixes for include_conf
 
 =back
 
+Dieter Bloms (B<dieter@bloms.de>)
+
+=over 4
+
+Multi-line configuration options
+
+=back
+
+Henning Moll (B<newsScott@gmx.de>)
+
+=over 4
+
+stop_on_stale_lockfile
+
+=back
+
+Ben Low (B<ben@bdlow.net>)
+
+=over 4
+
+Linux LVM snapshot support
+
+=back
+
 =head1 COPYRIGHT
 
 Copyright (C) 2003-2005 Nathan Rosenquist
 
-Portions Copyright (C) 2002-2006 Mike Rubel, Carl Wilhelm Soderstrom,
+Portions Copyright (C) 2002-2007 Mike Rubel, Carl Wilhelm Soderstrom,
 Ted Zlatanov, Carl Boe, Shane Liebling, Bharat Mediratta, Peter Palfrader,
 Nicolas Kaiser, David Cantrell, Chris Petersen, Robert Jackson, Justin Grote,
-David Keegel, Alan Batie
+David Keegel, Alan Batie, Dieter Bloms, Henning Moll, Ben Low, Anthony
+Ettinger
 
 This man page is distributed under the same license as rsnapshot:
 the GPL (see below).

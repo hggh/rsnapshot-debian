@@ -35,7 +35,7 @@ sub pretty_print(){
 	$FORMAT_TOP_NAME="BREPORTHEAD";
 	select($ofh);
 
-	foreach my $source (keys %bkdata){
+	foreach my $source (sort keys %bkdata){
 		if($bkdata{$source} =~ /error/i) { print "ERROR $source $bkdata{$source}"; next; }
 		my $files = $bkdata{$source}{'files'};
 		my $filest = $bkdata{$source}{'files_tran'};
@@ -108,10 +108,10 @@ while (my $line = nextLine(\@rsnapout)){
 			elsif($line =~ /File list transfer time:\s+(.+)/){
 				$bkdata{$source}{'file_list_trans_time'}=$1;
 			}
-			elsif($line =~ /ERROR/){ push(@errors,"$source $line"); } # we encountered an rsync error
+			elsif($line =~ /^(rsync error|ERROR): /){ push(@errors,"$source $line"); } # we encountered an rsync error
 		}
 	}
-	elsif($line =~ /ERROR/){ push(@errors,$line); } # we encountered an rsync error
+	elsif($line =~ /^(rsync error|ERROR): /){ push(@errors,$line); } # we encountered an rsync error
 }
 
 pretty_print();

@@ -3,6 +3,35 @@ rsnapshot changelog
 http://www.rsnapshot.org/
 ------------------------------------------------------------------------------
 
+VERSION 1.3.1  (Aug 31 2008)
+------------------------------------------------------------------------------
+- Fix help message mixup in lines between -c and -t.
+- Add more specific error messages for not currently implemented potential 
+  per backup point options, like cmd_preexec.
+- Allow named pipe as logfile - suggested by Patrice Levesque.
+- Include rsnapshot-copy script written by Matt McCutchen.
+- Allow `backticks` in include_conf.
+- Apply fix-sync_first-rollback.diff patch from Matt McCutchen (02 Apr 2008).
+- hopefully fix bug with link_dest not being used on second and later backups 
+  when you have link_dest 1 and sync_first 1. (Ignore $sync_dir_was_present)
+- Patch from Adam Greenbaum to allow passing of ssh arguments correctly.
+- David Grant added rsync_numtries to rsnapshot.conf.
+- Applied Ben Low's Linux LVM patch.
+- Added stop_on_stale_lockfile, thanks to Henning Moll.
+- Michael Ashley's fix for filter/space problems on the rsync command line.
+- Remove trailing whitespace from command names in rsnapshot.conf.
+- Warn about extra spaces between tab and argument.
+- Added multi-line config options, thanks to Dieter Bloms.
+- The 'interval' config option is now called 'retain'.
+- chdir to avoid an obscure bug in some versions of GNU rm.
+- Changed use_lazy_deletes option to use _delete.$$ directories.
+- Added note about -H and hard links to docs for rsync_short_args.
+- Include rsnapshot-diff.1 in rpm.
+- Fix bug with rsnapshot sync the first time (when .sync does not exist)
+  trying to copy hourly.0 to .sync, even if hourly.0 doesn't exist.
+  http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=413439
+
+
 VERSION 1.3.0  (Oct 21 2006)
 ------------------------------------------------------------------------------
 - Add files rsnapreport.pl Upgrading_from_1.1 rsnapshot-HOWTO.en.html to rpm.
