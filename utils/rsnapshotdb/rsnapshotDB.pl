@@ -1,20 +1,25 @@
 #!/usr/bin/perl
 
-=head
+=pod
 
-APPLICATION INFO: 
-Name: rsnapshotDB 1.2.1
-Bugs: rsnapshot-discuss@lists.sf.net
-License: GPL http://www.gnu.org/licenses/gpl.txt
+=head1 NAME: rsnapshotDB
+
 Web: http://www.rsnapshot.org
 
-Author: Anthony Ettinger
-Email: aettinger@sdsualumni.org
-Blog: http://www.chovy.com
+Bugs: rsnapshot-discuss@lists.sf.net
+
+License: GPL http://www.gnu.org/licenses/gpl.txt
+
+Version: 1.2.1
+
+=head1 AUTHOR: Anthony Ettinger
+
+Email: aettinger<--at-->sdsualumni<--dot-->org
+
+Blog: http://anthony.ettinger.name
 
 
-
-NOTES:
+=head1 DESCRIPTION:
 
 This script was originally written to function as a MySQL database backup script in conjunction with the open source Perl/rsync backup program "rsnapshot".  rsnapshot can be found at: http://www.rsnapshot.org/
 
@@ -28,17 +33,9 @@ If you don't know who YOU are - type 'whoami' or ask a friend.
 
 For best results, configure and run this script from /etc/rsnapshot.conf. (see:'man rsnapshot', backup_script).
 
-INSTALL:
+=head2 SEE ALSO:
 
-see INSTALL.txt
-
-TODO:
-
-see TODO.txt
-
-CHANGES:
-
-see CHANGES.txt
+INSTALL.txt, TODO.txt, CHANGES.txt
 
 =cut
 
@@ -49,7 +46,7 @@ use Data::Dumper;
 use DBI;
 use POSIX qw(strftime);
 
-=head
+=head3
 
 WARNING: type 'chmod 0600 /etc/rsnapshotDB.conf'
 Currently 'dbtype' supported can be either 'mysql' or 'pgsql'
@@ -66,9 +63,7 @@ my $xsd = '/etc/rsnapshotDB.xsd'; #used to validate config file
 my $xmlUsage = 1; #0 if using flat-list configuation file (deprecated).
 my $verbose = 2; #0 for no warning/status messages, increase for more.
 
-=head
-
-WARNING:
+=head2 WARNING:
 
 Setting the "temporary" directory:
 1) the db dump might get left behind on error
@@ -80,15 +75,14 @@ my $tmpDir = '$HOME/tmp'; #may want to change this^
 my $niceness = '19'; #amount of CPU/Mem -20 high, 19 low priority.
 my $sshOption = '-o TCPKeepAlive=yes'; #keep ssh alive (avoid timeouts)
 
-=head
-
-DUMPERS:
+=head2 DUMPERS:
 
 Location of "dumper" program(s)
 type 'which <db-dumper>' to find the path (ie - 'which mysqldump')
 Note: the hash key here must match 'dbtype' field in $dbpasswd file.
 
 =cut
+
 my $dbApp = {
 	'mysql'	=> {
 		'dumper' => {
@@ -172,7 +166,10 @@ sub read_dbpasswd
 		die "flat list is deprecated, please see INSTALL.txt";
 	}
 }
-=head
+
+=pod
+
+=head1
 
 END OF THE LINE:
 
@@ -184,9 +181,9 @@ Check the $localTmpDir or your /backups/.snapshot/foo/wherever you put your data
 
 package rsnapshotDB;
 
-=head
+=pod
 
-rsnapshotDB.pm
+=head1 rsnapshotDB.pm
 
 =cut
 
@@ -234,8 +231,12 @@ sub validateXML
 
 }
 
-=head
+=pod
+
+=head1 C<parseXML()>
+
 Utitility to parse our XML file for values
+
 =cut
 
 sub parseXML
@@ -287,9 +288,9 @@ sub parseXML
 	return $self;
 }
 
-=head
+=pod
 
-LOGIN REMOTELY:
+=head2 LOGIN REMOTELY:
 
 This is the section where you authenticate with the remote ssh server.
 
@@ -298,14 +299,15 @@ I'm pretty sure, you can just leave off the password flags if you know what you'
 Requirement: Net::SSH::Perl. If you don't have root, read about how to install a perl module as an under privileged user (it IS possible - /home/username/modules/).
 
 
-SHOW DATABASES;
-$self->showDB();
+=head2 SHOW DATABASES:
+
+C<$self-\>showDB();>
 
 This <em>should</em> pull down the list of your database user's databases from the XML configuration file.
 
 Note: This is done on the remote SSH server with db access. Since we're not writing or reading there isn't a lock on the table. The one restriction here is that you can actually access your database server remotely from an internal ssh server via ssh tunneling.
 
-PATH:
+=head2 PATH:
 
 Make sure your prompt binary (ie - mysql) and dumper binary (ie - mysqldump) are in your default path for the ssh user.
 
@@ -328,10 +330,12 @@ sub showDB
 	my $dumper = $dbApp->{$dbType}->{'dumper'}->{'bin'};
 	my $prompt = $dbApp->{$dbType}->{'prompt'}->{'bin'};
 	my $dbNames = []; #results from SHOW DATABASES;
+	my $dbpass_arg = defined($dbpass) ? "$dbApp->{$dbType}->{'prompt'}->{'pass'}$dbpass" : ''; #dbpass not required
 	
 
 	$self->v("START: showDB command...", 1);
-	my $cmdShowDB = "ssh $sshOption $user\@$host \"echo -n 'SHOW DATABASES;' | \ $dbApp->{$dbType}->{'prompt'}->{'bin'} \ $dbApp->{$dbType}->{'prompt'}->{'opts'} \ $dbApp->{$dbType}->{'prompt'}->{'user'} $dbuser \ $dbApp->{$dbType}->{'prompt'}->{'pass'}$dbpass \ $dbApp->{$dbType}->{'prompt'}->{'host'} $dbhost\""; 
+	my $cmdShowDB = "ssh $sshOption $user\@$host \"echo -n 'SHOW DATABASES;' | \ $dbApp->{$dbType}->{'prompt'}->{'bin'} \ $dbApp->{$dbType}->{'prompt'}->{'opts'} \ $dbApp->{$dbType}->{'prompt'}->{'user'} $dbuser \ $dbpass_arg \ $dbApp->{$dbType}->{'prompt'}->{'host'} $dbhost\""; 
+
 	my $out = qx/$cmdShowDB/ or warn 'SHOW DATABASES failed...';
 	$self->v("CMD: $cmdShowDB -> $out.", 2);
 	$self->v("DONE: showDB command.", 1);
@@ -344,10 +348,9 @@ sub showDB
 	return $self;
 }
 
-=head
+=pod
 
-DUMP DATABASE:
-
+=head2 DUMP DATABASE:
 
 This is the bulk of the app, via ssh tunneling, logs in to an internal ssh server with access to the database server. The main reason for speeding this application up was becauase a remote  database pull is extremely inefficient directly over the internet.
 
@@ -383,10 +386,10 @@ sub dumbDB
 	$self->v("SET: remote temp dir... '$remoteTmpDir'", 1);
 
 	#dumper arguments
-        my $dumpOptsArg = $dbApp->{$dbType}->{'dumper'}->{'opts'};
-        my $dumpHostArg = $dbApp->{$dbType}->{'dumper'}->{'host'};
-        my $dumpUserArg = $dbApp->{$dbType}->{'dumper'}->{'user'};
-        my $dumpPassArg = $dbApp->{$dbType}->{'dumper'}->{'pass'};
+	my $dumpOptsArg = $dbApp->{$dbType}->{'dumper'}->{'opts'};
+	my $dumpHostArg = $dbApp->{$dbType}->{'dumper'}->{'host'};
+	my $dumpUserArg = $dbApp->{$dbType}->{'dumper'}->{'user'};
+	my $dumpPassArg = $dbApp->{$dbType}->{'dumper'}->{'pass'};
 
 	foreach my $dbName (@{$dbNames})
 	{
@@ -415,7 +418,7 @@ sub dumbDB
 		}
 	
 		#the actual .sql.gz remote file creation!
-                my $cmdRemoteDump = "ssh $sshOption $user\@$host 'nice --adjustment=$niceness $dumper \ $dumpOptsArg $dumpUserArg $dbuser $dumpPassArg" . "$dbpass $dumpHostArg $dbhost \ $dbName > $remoteTmpDir/$file.sql'";
+		my $cmdRemoteDump = "ssh $sshOption $user\@$host 'umask 0077;nice --adjustment=$niceness $dumper \ $dumpOptsArg $dumpUserArg $dbuser $dumpPassArg" . "$dbpass $dumpHostArg $dbhost \ $dbName > $remoteTmpDir/$file.sql'";
 
 		$self->v("WAITING: remote dump...", 1);
 		$out = qx/$cmdRemoteDump/;
@@ -448,7 +451,10 @@ sub dumbDB
 	}
 }
 
-=head
+=pod
+
+=head2
+
 SECURE COPY:
 
 At this point it's necessary to use ssh-keygen to connect to the server, the local command is using SSH tunneling.
@@ -475,6 +481,7 @@ sub v
 	my ($self, $msg, $level) = @_;
 
 	open(LOG, ">>/var/log/rsnapshotDB") or warn "$!";
+	chmod 0600, "/var/log/rsnapshotDB";
 
 	if ($self->_verbose >= $level) {
 		print LOG "$msg\n";
@@ -573,8 +580,10 @@ sub _verbose
 
 1;
 
-=head
-MORE INFO:
+=pod
+
+=head1 MORE INFO:
 
 see README.txt
+
 =cut
