@@ -37,9 +37,9 @@ The default configuration file is available at
 /usr/share/doc/rsnapshot/examples/rsnapshot.conf.default.gz
 
 Important considerations on config file (from #496908):
-The first interval in the configuration file is always the one that  
-get synced from the "backup" sources specified at the bottom of your  
-configuration file. All the other intervals simply moves the oldest  
+The first interval in the configuration file is always the one that
+get synced from the "backup" sources specified at the bottom of your
+configuration file. All the other intervals simply moves the oldest
 copy of the interval listed immediately above in the configuration file.
 
 

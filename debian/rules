@@ -1,8 +1,6 @@
 #!/usr/bin/make -f
 # -*- makefile -*-
 
-include /usr/share/quilt/quilt.make
-
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
@@ -42,7 +40,7 @@ endif
 	--prefix=/usr --mandir=\$${prefix}/share/man --infodir=\$${prefix}/share/info --sysconfdir=/etc
 
 #Architecture
-build: patch build-indep
+build: build-indep
 
 build-indep: build-indep-stamp
 build-indep-stamp: config.status
@@ -50,7 +48,7 @@ build-indep-stamp: config.status
 	# Add here commands to compile the indep part of the package.
 	touch $@
 
-clean: unpatch
+clean:
 	dh_testdir
 	dh_testroot
 	rm -f build-indep-stamp
