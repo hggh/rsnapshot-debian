@@ -1,0 +1,22 @@
+--- a/rsnapshot.1
++++ b/rsnapshot.1
+@@ -326,7 +326,7 @@
+ .RE
+ .RS 4
+ .Sp
+-daily.0/ will be copied from hourly.5/, and weekly.0/ will be copied from daily.6/
++daily.0/ will be moved from hourly.5/, and weekly.0/ will be copied from daily.6/
+ .Sp
+ hourly.0/ will be rsynced directly from the filesystem.
+ .RE
+--- a/rsnapshot-program.pl
++++ b/rsnapshot-program.pl
+@@ -6268,7 +6268,7 @@
+ 
+ =back
+ 
+-daily.0/ will be copied from hourly.5/, and weekly.0/ will be copied from daily.6/
++daily.0/ will be moved from hourly.5/, and weekly.0/ will be copied from daily.6/
+ 
+ hourly.0/ will be rsynced directly from the filesystem.
+ 
