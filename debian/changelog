@@ -1,19 +1,27 @@
 rsnapshot (1.3.1-2) unstable; urgency=low
 
-  * debian/patches/07_cmd_rsnapshot_diff_path:
-    + Fix commented path to rsnapshot-diff (Closes: #572751)
+  * Reorganize patches:
+    Merge 02_default_rsnapshot_conf_manpage and 04_default_backup_dir
+      to 01_logfile_rsnapshot_conf, renammed 01_rsnapshot_conf
+  * Refresh debian/patches/01_rsnapshot_conf:
+    + Change commented path to rsnapshot-diff (Closes: #572751)
+    + Uncomment link_dest support to enable it by default (Closes: #586442)
   * debian/patches/08_manpage_hourly_to_daily:
     + Add precision on weekly rotation (Closes: #573253)
   * debian/control:
     + Add ssh-client as virtual alternative
-    + Bump Standards-Version 3.8.4 (no changes needed)
+    + Bump Standards-Version 3.9.0.0 (no changes needed)
   * Switch to dpkg-source 3.0 (quilt) format
     + Remove {un,}patch, quilt inclusion in debian/rules
     + Delete unnecessary debian/README.source
     + Remove Build-Depends on quilt
+  * debian/rules:
+    + Delete unnecessary manpages generation (using dh_installman instead)
+    + Delete default comments
+  * debian/manpages: Add rsnapshot.1 and rsnapshot-diff.1
   * debian/README.Debian: Delete unnecessary spaces
 
- -- Guillaume Delacour <gui@iroqwa.org>  Sun, 11 Apr 2010 09:44:51 +0000
+ -- Guillaume Delacour <gui@iroqwa.org>  Sat, 03 Jul 2010 19:05:05 +0200
 
 rsnapshot (1.3.1-1) unstable; urgency=low
 

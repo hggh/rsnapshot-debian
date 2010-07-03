@@ -33,8 +33,6 @@ ifeq "$(wildcard rsnapshot-diff.1.bak)" ""
 	cp -f rsnapshot-diff.1 rsnapshot-diff.1.bak
 endif
 
-
-	# Add here commands to configure the package.
 	touch aclocal.m4 Makefile.in configure
 	./configure --host=$(DEB_HOST_GNU_TYPE) --build=$(DEB_BUILD_GNU_TYPE) \
 	--prefix=/usr --mandir=\$${prefix}/share/man --infodir=\$${prefix}/share/info --sysconfdir=/etc
@@ -45,7 +43,6 @@ build: build-indep
 build-indep: build-indep-stamp
 build-indep-stamp: config.status
 
-	# Add here commands to compile the indep part of the package.
 	touch $@
 
 clean:
@@ -53,7 +50,6 @@ clean:
 	dh_testroot
 	rm -f build-indep-stamp
 
-	# Add here commands to clean up after the build process.
 	[ ! -f Makefile ] || $(MAKE) distclean
 ifneq "$(wildcard config.sub.bak)" ""
 	cp -f config.sub.bak config.sub
@@ -76,16 +72,13 @@ install-indep:
 	dh_prep
 	dh_installdirs -i
 
-	# Add here commands to install the indep part of the package into
-	# debian/rsnapshot.
 	$(MAKE) install DESTDIR=$(CURDIR)/debian/rsnapshot
-	cp $(CURDIR)/docs/HOWTOs/rsnapshot-HOWTO.en.html $(CURDIR)/debian/rsnapshot/usr/share/doc/rsnapshot/html/
-	mv $(CURDIR)/debian/rsnapshot/etc/rsnapshot.conf.default $(CURDIR)/debian/rsnapshot/etc/rsnapshot.conf
 
-	# Manpages
-	mkdir -p $(CURDIR)/debian/rsnapshot/usr/share/man/man1
-	gzip -9 -c $(CURDIR)/rsnapshot.1 > $(CURDIR)/debian/rsnapshot/usr/share/man/man1/rsnapshot.1.gz
-	gzip -9 -c $(CURDIR)/rsnapshot-diff.1 > $(CURDIR)/debian/rsnapshot/usr/share/man/man1/rsnapshot-diff.1.gz
+	# html, see debian/doc-base
+	cp $(CURDIR)/docs/HOWTOs/rsnapshot-HOWTO.en.html $(CURDIR)/debian/rsnapshot/usr/share/doc/rsnapshot/html/
+
+	# rename default configfile
+	mv $(CURDIR)/debian/rsnapshot/etc/rsnapshot.conf.default $(CURDIR)/debian/rsnapshot/etc/rsnapshot.conf
 
 	# lintian override on /var/cache/rsnapshot perms
 	mkdir -p $(CURDIR)/debian/rsnapshot/usr/share/lintian/overrides/

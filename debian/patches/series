@@ -1,8 +1,5 @@
-08_manpage_hourly_to_daily
-01_logfile_rsnapshot_conf
-02_default_rsnapshot_conf_manpage
+01_rsnapshot_conf
 03_pod_missing_back
-04_default_backup_dir
 05_backup_pgsql
 06_fix_random_file_verify
-07_cmd_rsnapshot_diff_path
+08_manpage_hourly_to_daily
