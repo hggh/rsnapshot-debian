@@ -5,12 +5,11 @@ rsnapshot (1.3.1-2) unstable; urgency=low
       to 01_logfile_rsnapshot_conf, renammed 01_rsnapshot_conf
   * Refresh debian/patches/01_rsnapshot_conf:
     + Change commented path to rsnapshot-diff (Closes: #572751)
-    + Uncomment link_dest support to enable it by default (Closes: #586442)
   * debian/patches/08_manpage_hourly_to_daily:
     + Add precision on weekly rotation (Closes: #573253)
   * debian/control:
     + Add ssh-client as virtual alternative
-    + Bump Standards-Version 3.9.0.0 (no changes needed)
+    + Bump Standards-Version 3.9.1 (no changes needed)
   * Switch to dpkg-source 3.0 (quilt) format
     + Remove {un,}patch, quilt inclusion in debian/rules
     + Delete unnecessary debian/README.source

@@ -34,15 +34,6 @@ rsnapshot.conf Debian configuration choices:
  
  # If enabled, rsnapshot will write a lockfile to prevent two instances
  # from running simultaneously (and messing up the snapshot_root).
-@@ -164,7 +164,7 @@
- # This is the best way to support special files (FIFOs, etc) cross-platform.
- # The default is 0 (off).
- #
--#link_dest	0
-+link_dest	0
- 
- # When sync_first is enabled, it changes the default behaviour of rsnapshot.
- # Normally, when rsnapshot is called with its lowest interval
 --- a/rsnapshot-program.pl
 +++ b/rsnapshot-program.pl
 @@ -6120,10 +6120,10 @@
