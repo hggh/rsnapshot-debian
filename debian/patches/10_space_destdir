@@ -1,0 +1,16 @@
+Remove backslash found in destpath in config file
+
+--- a/rsnapshot-program.pl
++++ b/rsnapshot-program.pl
+@@ -4116,7 +4116,10 @@
+ 	if ($destpath =~ m/\/$/) {
+ 		$destpath = remove_trailing_slash($destpath);
+ 	}
+-	
++
++        # remove any backslash escaping spaces, leave mkpath do the job
++        $destpath =~ s/\\ +//;
++
+ 	# create the directory if it doesn't exist
+ 	if ( ! -e "$destpath" ) {
+ 		print_cmd("mkdir -m 0755 -p $destpath/");
