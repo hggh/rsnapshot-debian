@@ -49,6 +49,7 @@ clean:
 	dh_testdir
 	dh_testroot
 	rm -f build-indep-stamp
+	rm -rf t/support/snapshots/*
 
 	[ ! -f Makefile ] || $(MAKE) distclean
 ifneq "$(wildcard config.sub.bak)" ""
@@ -71,6 +72,9 @@ install-indep:
 	dh_testroot
 	dh_prep
 	dh_installdirs -i
+
+	# run upstream unit tests (make test)
+	dh_auto_test
 
 	$(MAKE) install DESTDIR=$(CURDIR)/debian/rsnapshot
 
