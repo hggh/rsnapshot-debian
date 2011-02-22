@@ -3,3 +3,4 @@
 05_backup_pgsql
 06_fix_random_file_verify
 08_manpage_hourly_to_daily
+09_strip_backtick

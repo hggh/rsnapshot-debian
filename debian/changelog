@@ -7,6 +7,8 @@ rsnapshot (1.3.1-2) unstable; urgency=low
     + Change commented path to rsnapshot-diff (Closes: #572751)
   * debian/patches/08_manpage_hourly_to_daily:
     + Add precision on weekly rotation (Closes: #573253)
+  * debian/patches/09_strip_backtick: Strip backtick in include_conf
+    (Closes: #614167)
   * debian/control:
     + Add ssh-client as virtual alternative
     + Bump Standards-Version 3.9.1 (no changes needed)
