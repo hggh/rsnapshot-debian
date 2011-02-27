@@ -1,127 +1,37 @@
 #!/usr/bin/make -f
 # -*- makefile -*-
 
-# Uncomment this to turn on verbose mode.
-#export DH_VERBOSE=1
+override_dh_auto_clean:
+	[ ! -f Makefile ] || $(MAKE) clean
+	# restore upstream files
+	[ ! -f rsnapshot.1.bak ]      || cp -f rsnapshot.1.bak      rsnapshot.1
+	[ ! -f rsnapshot-diff.1.bak ] || cp -f rsnapshot-diff.1.bak rsnapshot-diff.1
 
-# This has to be exported to make some magic below work.
-export DH_OPTIONS
-
-# These are used for cross-compiling and for saving the configure script
-# from having to guess our platform (since we know it already)
-DEB_HOST_GNU_TYPE   ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
-DEB_BUILD_GNU_TYPE  ?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
-
-config.status: configure
-	dh_testdir
-ifeq "$(wildcard config.sub.bak)" ""
-	cp -f config.sub config.sub.bak
-endif
-ifeq "$(wildcard config.guess.bak)" ""
-	cp -f config.guess config.guess.bak
-endif
-ifneq "$(wildcard /usr/share/misc/config.sub)" ""
-	cp -f /usr/share/misc/config.sub config.sub
-endif
-ifneq "$(wildcard /usr/share/misc/config.guess)" ""
-	cp -f /usr/share/misc/config.guess config.guess
-endif
-ifeq "$(wildcard rsnapshot.1.bak)" ""
-	cp -f rsnapshot.1 rsnapshot.1.bak
-endif
-ifeq "$(wildcard rsnapshot-diff.1.bak)" ""
+override_dh_auto_configure:
+	# backup upstream automatically generated files
+	cp -f rsnapshot.1      rsnapshot.1.bak
 	cp -f rsnapshot-diff.1 rsnapshot-diff.1.bak
-endif
+	dh_auto_configure
 
-	touch aclocal.m4 Makefile.in configure
-	./configure --host=$(DEB_HOST_GNU_TYPE) --build=$(DEB_BUILD_GNU_TYPE) \
-	--prefix=/usr --mandir=\$${prefix}/share/man --infodir=\$${prefix}/share/info --sysconfdir=/etc
-
-#Architecture
-build: build-indep
-
-build-indep: build-indep-stamp
-build-indep-stamp: config.status
-
-	touch $@
-
-clean:
-	dh_testdir
-	dh_testroot
-	rm -f build-indep-stamp
-	rm -rf t/support/snapshots/*
-
-	[ ! -f Makefile ] || $(MAKE) distclean
-ifneq "$(wildcard config.sub.bak)" ""
-	cp -f config.sub.bak config.sub
-endif
-ifneq "$(wildcard config.guess.bak)" ""
-	cp -f config.guess.bak config.guess
-endif
-ifneq "$(wildcard rsnapshot.1.bak)" ""
-	cp -f rsnapshot.1.bak rsnapshot.1
-endif
-ifneq "$(wildcard rsnapshot-diff.1.bak)" ""
-	cp -f rsnapshot-diff.1.bak rsnapshot-diff.1
-endif
-	dh_clean
-
-install: install-indep
-install-indep:
-	dh_testdir
-	dh_testroot
-	dh_prep
-	dh_installdirs -i
-
-	# run upstream unit tests (make test)
-	dh_auto_test
-
-	$(MAKE) install DESTDIR=$(CURDIR)/debian/rsnapshot
-
-	# html, see debian/doc-base
-	cp $(CURDIR)/docs/HOWTOs/rsnapshot-HOWTO.en.html $(CURDIR)/debian/rsnapshot/usr/share/doc/rsnapshot/html/
-
+override_dh_install:
+	dh_install
 	# rename default configfile
 	mv $(CURDIR)/debian/rsnapshot/etc/rsnapshot.conf.default $(CURDIR)/debian/rsnapshot/etc/rsnapshot.conf
-
 	# lintian override on /var/cache/rsnapshot perms
 	mkdir -p $(CURDIR)/debian/rsnapshot/usr/share/lintian/overrides/
 	cp $(CURDIR)/debian/lintian-overrides $(CURDIR)/debian/rsnapshot/usr/share/lintian/overrides/rsnapshot
+	# html doc, see debian/doc-base
+	cp $(CURDIR)/docs/HOWTOs/rsnapshot-HOWTO.en.html $(CURDIR)/debian/rsnapshot/usr/share/doc/rsnapshot/html/
 
-	dh_install -i
-
-binary-common:
-	dh_testdir
-	dh_testroot
-	dh_installchangelogs ChangeLog
-	dh_installdocs
+override_dh_installexamples:
 	dh_installexamples
-
 	# Remove unnecessary extra license file, as per Policy Manual section 12.5
 	rm $(CURDIR)/debian/rsnapshot/usr/share/doc/rsnapshot/examples/utils/rsnapshotdb/LICENSE.txt
 
-	dh_installlogrotate	
-	dh_installcron
-	dh_installman
-	dh_link
-	dh_strip
-	dh_compress
+override_dh_fixperms:
 	dh_fixperms
-
 	# Fix permissions of the default rsnapshot_root directory
 	chmod 0700 $(CURDIR)/debian/rsnapshot/var/cache/rsnapshot
 
-	dh_perl
-	dh_installdeb
-	dh_gencontrol
-	dh_md5sums
-	dh_builddeb
-
-# Build architecture independant packages using the common target.
-binary-indep: build-indep install-indep
-	$(MAKE) -f debian/rules DH_OPTIONS=-i binary-common
-
-binary-arch:
-
-binary: binary-indep
-.PHONY: build clean binary-indep binary install install-indep
+%:
+	dh $@ --with autotools-dev
