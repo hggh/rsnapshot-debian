@@ -1,0 +1,108 @@
+Prepare lvm snapshot configuration
+
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -103,6 +103,10 @@
+ CMD_RM = @CMD_RM@
+ CMD_RSYNC = @CMD_RSYNC@
+ CMD_SSH = @CMD_SSH@
++CMD_LVCREATE = @CMD_LVCREATE@
++CMD_LVREMOVE = @CMD_LVREMOVE@
++CMD_MOUNT = @CMD_MOUNT@
++CMD_UMOUNT = @CMD_UMOUNT@
+ CP = @CP@
+ CWD = @CWD@
+ CYGPATH_W = @CYGPATH_W@
+--- a/rsnapshot.conf.default.in
++++ b/rsnapshot.conf.default.in
+@@ -80,6 +80,14 @@
+ #
+ #cmd_postexec	/path/to/postexec/script
+ 
++# Paths to lvcreate, lvremove, mount and umount commands, for use with
++# Linux LVMs.
++#
++linux_lvm_cmd_lvcreate	@CMD_LVCREATE@
++linux_lvm_cmd_lvremove	@CMD_LVREMOVE@
++linux_lvm_cmd_mount	@CMD_MOUNT@
++linux_lvm_cmd_umount	@CMD_UMOUNT@
++
+ #########################################
+ #           BACKUP INTERVALS            #
+ # Must be unique and in ascending order #
+@@ -188,6 +196,26 @@
+ #
+ #rsync_numtries 0
+ 
++# LVM parameters. Used to backup with creating lvm snapshot before backup
++# and removing it after. This should ensure consistency of data in some special
++# cases
++#
++# LVM snapshot(s) size (lvcreate --size option).
++#
++#linux_lvm_snapshotsize	100M
++
++# Name to be used when creating the LVM logical volume snapshot(s).
++#
++#linux_lvm_snapshotname	rsnapshot
++
++# Path to the LVM Volume Groups.
++#
++#linux_lvm_vgpath	/dev
++
++# Mount point to use to temporarily mount the snapshot(s).
++#
++#linux_lvm_mountpath	/path/to/mount/lvm/snapshot/during/backup
++
+ ###############################
+ ### BACKUP POINTS / SCRIPTS ###
+ ###############################
+@@ -201,6 +229,8 @@
+ #backup	/home/foo/My Documents/		localhost/
+ #backup	/foo/bar/	localhost/	one_fs=1, rsync_short_args=-urltvpog
+ #backup_script	/usr/local/bin/backup_pgsql.sh	localhost/postgres/
++# You must set linux_lvm_* parameters below before using lvm snapshots
++#backup	lvm://vg0/xen-home/	lvm-vg0/xen-home/
+ 
+ # EXAMPLE.COM
+ #backup_script	/bin/date "+ backup of example.com started at %c"	unused1
+--- a/configure.ac
++++ b/configure.ac
+@@ -176,6 +176,37 @@
+ AC_SUBST(CMD_SSH, "cmd_ssh	$SSH")
+ 
+ 
++dnl
++dnl LVM COMMANDS CHECK (optional programs)
++dnl
++dnl lvcreate
++AC_PATH_PROG(LVCREATE, lvcreate, no)
++if test "$LVCREATE" = "no"; then
++	LVCREATE=/path/to/lvcreate
++fi
++AC_SUBST(CMD_LVCREATE, "$LVCREATE")
++
++dnl lvremove
++AC_PATH_PROG(LVREMOVE, lvremove, no)
++if test "$LVREMOVE" = "no"; then
++	LVREMOVE=/path/to/lvremove
++fi
++AC_SUBST(CMD_LVREMOVE, "$LVREMOVE")
++
++dnl mount
++AC_PATH_PROG(MOUNT, mount, no)
++if test "$MOUNT" = "no"; then
++	MOUNT=/path/to/mount
++fi
++AC_SUBST(CMD_MOUNT, "$MOUNT")
++
++dnl umount
++AC_PATH_PROG(UMOUNT, umount, no)
++if test "$UMOUNT" = "no"; then
++	UMOUNT=/path/to/umount
++fi
++AC_SUBST(CMD_UMOUNT, "$UMOUNT")
++
+ 
+ dnl
+ dnl LOGGER CHECK (optional program)

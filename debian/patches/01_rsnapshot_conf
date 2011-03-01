@@ -4,6 +4,7 @@ rsnapshot.conf Debian configuration choices:
 - Change path for rsnapshot-diff
 - Uncomment rsync link_dest support
 - Manpage: point to the real default file on Debian systems
+- Replace interval (deprecated alias) with retain
 
 --- a/rsnapshot.conf.default.in
 +++ b/rsnapshot.conf.default.in
@@ -25,6 +26,21 @@ rsnapshot.conf Debian configuration choices:
  
  # Specify the path to a script (and any optional arguments) to run right
  # before rsnapshot syncs files
+@@ -86,10 +86,10 @@
+ # i.e. hourly, daily, weekly, etc.      #
+ #########################################
+ 
+-interval	hourly	6
+-interval	daily	7
+-interval	weekly	4
+-#interval	monthly	3
++retain		hourly	6
++retain		daily	7
++retain		weekly	4
++#retain		monthly	3
+ 
+ ############################################
+ #              GLOBAL OPTIONS              #
 @@ -113,7 +113,7 @@
  # If you enable this, data will be written to the file you specify. The
  # amount of data written is controlled by the "loglevel" parameter.

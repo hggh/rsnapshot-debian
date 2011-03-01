@@ -5,3 +5,4 @@
 08_manpage_hourly_to_daily
 09_strip_backtick
 10_space_destdir
+11_lvm_snapshots
