@@ -22,10 +22,10 @@ Prepare lvm snapshot configuration
 +# Paths to lvcreate, lvremove, mount and umount commands, for use with
 +# Linux LVMs.
 +#
-+linux_lvm_cmd_lvcreate	@CMD_LVCREATE@
-+linux_lvm_cmd_lvremove	@CMD_LVREMOVE@
-+linux_lvm_cmd_mount	@CMD_MOUNT@
-+linux_lvm_cmd_umount	@CMD_UMOUNT@
++#linux_lvm_cmd_lvcreate	@CMD_LVCREATE@
++#linux_lvm_cmd_lvremove	@CMD_LVREMOVE@
++#linux_lvm_cmd_mount	@CMD_MOUNT@
++#linux_lvm_cmd_umount	@CMD_UMOUNT@
 +
  #########################################
  #           BACKUP INTERVALS            #
