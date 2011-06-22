@@ -1,3 +1,16 @@
+rsnapshot (1.3.1-3) unstable; urgency=low
+
+  * debian/patches/01_rsnapshot_conf:
+    + Remove one tab for alignment in retain
+    + Uncomment cmd_cp to enable use of GNU cp (Closes: #617509)
+    + Add stop_on_stale_lockfile option (Closes: #629309)
+    + Refresh comments
+  * debian/control:
+    + Bump Standards-Version 3.9.2 (no changes needed)
+    + Align Build-Depends-Indep
+
+ -- Guillaume Delacour <gui@iroqwa.org>  Wed, 22 Jun 2011 22:08:45 +0200
+
 rsnapshot (1.3.1-2) unstable; urgency=low
 
   * Reorganize patches:
