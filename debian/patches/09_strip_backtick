@@ -1,4 +1,7 @@
-Strip backtick before inclusion (r1.406 from upstream)
+From: Guillaume Delacour <gui@iroqwa.org>
+Subject: Strip backtick before inclusion
+Origin: upstream, http://rsnapshot.cvs.sourceforge.net/viewvc/rsnapshot/rsnapshot/rsnapshot-program.pl?r1=1.405&r2=1.406&view=patch
+Bug-Debian: http://bugs.debian.org/614167
 
 --- a/rsnapshot-program.pl	2008/10/13 21:00:35	1.405
 +++ b/rsnapshot-program.pl	2008/12/04 16:02:09	1.406

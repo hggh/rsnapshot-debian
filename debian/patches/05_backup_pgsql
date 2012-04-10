@@ -1,4 +1,7 @@
-Apply patch to backup_pgsql.sh, Debian issues.
+From: Guillaume Delacour <gui@iroqwa.org>
+Subject: Fix path call pg_dumpall
+Bug-Debian: http:/bugs.debian.org/500082
+Forwarded: not-needed
 
 --- a/utils/backup_pgsql.sh
 +++ b/utils/backup_pgsql.sh

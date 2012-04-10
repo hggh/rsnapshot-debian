@@ -6,3 +6,4 @@
 09_strip_backtick
 10_space_destdir
 11_lvm_snapshots
+12_include_conf_with_arguments

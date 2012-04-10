@@ -2,7 +2,7 @@
 # -*- makefile -*-
 
 UPSTREAM_AUTOCONF_GENERATED_FILES = rsnapshot.1 rsnapshot-diff.1 INSTALL \
-	aclocal.m4 configure install-sh missing mkinstalldirs
+	aclocal.m4 configure install-sh missing mkinstalldirs Makefile.in
 
 override_dh_auto_clean:
 	[ ! -f Makefile ] || $(MAKE) clean

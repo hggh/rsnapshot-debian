@@ -1,4 +1,6 @@
-Add missing "=back" to fix pod2man error.
+From: Guillaume Delacour <gui@iroqwa.org>
+Subject: Add missing "=back" to fix pod2man error.
+Origin: upstream, http://rsnapshot.cvs.sourceforge.net/viewvc/rsnapshot/rsnapshot/rsnapshot-program.pl?r1=1.408&r2=1.409&view=patch
 
 --- a/rsnapshot-program.pl
 +++ b/rsnapshot-program.pl

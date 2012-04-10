@@ -1,18 +1,8 @@
-Prepare lvm snapshot configuration
+From: Guillaume Delacour <gui@iroqwa.org>
+Subject: Prepare lvm snapshot configuration
+Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/rsnapshot/+bug/713464
+Forwarded: no
 
---- a/Makefile.in
-+++ b/Makefile.in
-@@ -103,6 +103,10 @@
- CMD_RM = @CMD_RM@
- CMD_RSYNC = @CMD_RSYNC@
- CMD_SSH = @CMD_SSH@
-+CMD_LVCREATE = @CMD_LVCREATE@
-+CMD_LVREMOVE = @CMD_LVREMOVE@
-+CMD_MOUNT = @CMD_MOUNT@
-+CMD_UMOUNT = @CMD_UMOUNT@
- CP = @CP@
- CWD = @CWD@
- CYGPATH_W = @CYGPATH_W@
 --- a/rsnapshot.conf.default.in
 +++ b/rsnapshot.conf.default.in
 @@ -80,6 +80,14 @@

@@ -1,4 +1,6 @@
-Fix some error on upstream example shell script utils/random_file_verify.sh.
+From: Guillaume Delacour <gui@iroqwa.org>
+Subject: Fix some error on upstream example shell script utils/random_file_verify.sh.
+Forwarded: no
 
 --- a/utils/random_file_verify.sh
 +++ b/utils/random_file_verify.sh
