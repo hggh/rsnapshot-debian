@@ -6,10 +6,10 @@ Uploaders: MJ Ray (Debian) <mjr@debian.org>
 Build-Depends: debhelper (>= 8)
 Build-Depends-Indep: autotools-dev, rsync, openssh-client | ssh-client,
                      lvm2, udev, dh-autoreconf
-Standards-Version: 3.9.3
+Standards-Version: 3.9.4
 Homepage: http://www.rsnapshot.org/
-Vcs-Browser: http://git.debian.org/?p=collab-maint/rsnapshot.git
-Vcs-Git: git://git.debian.org/collab-maint/rsnapshot.git
+Vcs-Browser: http://anonscm.debian.org/gitweb/?p=collab-maint/rsnapshot.git
+Vcs-Git: git://anonscm.debian.org/collab-maint/rsnapshot.git
 
 Package: rsnapshot
 Architecture: all
