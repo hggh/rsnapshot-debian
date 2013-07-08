@@ -1,0 +1,16 @@
+From: Nicolas Courtel <courtel@cena.fr>
+Subject: WARNING prefix missing in some warning messages
+Bug-Debian: http://bugs.debian.org/688790
+Forwarded: https://sourceforge.net/p/rsnapshot/patches/14/
+
+--- a/rsnapshot-program.pl
++++ b/rsnapshot-program.pl
+@@ -2028,7 +2028,7 @@
+ 	}
+ 	
+ 	# write to log
+-	log_msg($str, $level);
++	log_warn($str, $level);
+ }
+ 
+ # accepts string, and level
