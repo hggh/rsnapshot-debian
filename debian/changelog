@@ -1,3 +1,17 @@
+rsnapshot (1.3.1-5) unstable; urgency=low
+
+  * debian/patches/14_rsync_rsh_quoting.diff: Quoting rsync --rsh arguments
+    is no more needed (because of debian/patches/10_space_destdir applied)
+    (Closes: #717451)
+  * debian/patches/11_lvm_snapshots.diff: Mark as forwarded
+  * debian/patches/05_backup_pgsql.diff: Fix 'could not change directory'
+    warning if tmpdir not accessible by postgres user (Closes: #718189)
+  * debian/patches/01_rsnapshot_conf.diff: Update patch to change the
+    description of rsync_numentries option in configuration file
+    (Closes: #717940)
+
+ -- Guillaume Delacour <gui@iroqwa.org>  Sun, 28 Jul 2013 18:05:26 +0200
+
 rsnapshot (1.3.1-4) unstable; urgency=low
 
   * debian/patches/01_rsnapshot_conf: Refresh patch to fix path of rsnapshot in

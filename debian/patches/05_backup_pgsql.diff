@@ -2,6 +2,7 @@ From: Guillaume Delacour <gui@iroqwa.org>
 Subject: Fix path call pg_dumpall
 Bug-Debian: http:/bugs.debian.org/500082
 Forwarded: not-needed
+Last-Update: 2013-07-31
 
 --- a/utils/backup_pgsql.sh
 +++ b/utils/backup_pgsql.sh
@@ -33,7 +34,7 @@ Forwarded: not-needed
  
  # backup the database
 -/usr/local/pgsql/bin/pg_dumpall -Upostgres > pg_dumpall.sql
-+su -c 'pg_dumpall > ~/pg_dumpall.sql' postgres
++su -l -c 'pg_dumpall > ~/pg_dumpall.sql' postgres
  
  # make the backup readable only by root
 -/bin/chmod 600 pg_dumpall.sql

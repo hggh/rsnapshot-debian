@@ -1,3 +1,4 @@
+14_rsync_rsh_quoting.diff
 01_rsnapshot_conf.diff
 03_pod_missing_back.diff
 05_backup_pgsql.diff

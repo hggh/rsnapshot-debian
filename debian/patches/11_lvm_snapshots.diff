@@ -1,7 +1,7 @@
 From: Guillaume Delacour <gui@iroqwa.org>
 Subject: Prepare lvm snapshot configuration
 Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/rsnapshot/+bug/713464
-Forwarded: no
+Forwarded: https://sourceforge.net/p/rsnapshot/patches/15/
 
 --- a/rsnapshot.conf.default.in
 +++ b/rsnapshot.conf.default.in
