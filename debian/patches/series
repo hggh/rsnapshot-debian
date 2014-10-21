@@ -8,3 +8,4 @@
 11_lvm_snapshots.diff
 12_include_conf_with_arguments.diff
 13_print_warn.diff
+15-remove-dead-external-css-link.patch
