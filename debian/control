@@ -3,7 +3,7 @@ Section: utils
 Priority: optional
 Maintainer: Guillaume Delacour <gui@iroqwa.org>
 Uploaders: MJ Ray (Debian) <mjr@debian.org>
-Build-Depends: debhelper (>= 8)
+Build-Depends: debhelper (>= 9)
 Build-Depends-Indep: autotools-dev, rsync, openssh-client | ssh-client,
                      lvm2, udev, dh-autoreconf
 Standards-Version: 3.9.4
