@@ -1,8 +1,13 @@
-rsnapshot (1.3.1-5) unstable; urgency=low
+rsnapshot (1.3.1-5.1) unstable; urgency=low
 
-  * debian/patches/14_rsync_rsh_quoting.diff: Quoting rsync --rsh arguments
-    is no more needed (because of debian/patches/10_space_destdir applied)
-    (Closes: #717451)
+  * Non-maintainer upload
+  * switch to debhelper 9 compat for build hardening flags
+  * Standards-Version: 3.9.6
+  * set Vcs-* tags to canonical URLs
+  * include run-rsnapshot as example script (Closes: #523923)
+  * cron scripts run hourly/daily/etc and are compatible with anacron
+
+  [ Guillaume Delacour ]
   * debian/patches/11_lvm_snapshots.diff: Mark as forwarded
   * debian/patches/05_backup_pgsql.diff: Fix 'could not change directory'
     warning if tmpdir not accessible by postgres user (Closes: #718189)
@@ -10,7 +15,7 @@ rsnapshot (1.3.1-5) unstable; urgency=low
     description of rsync_numentries option in configuration file
     (Closes: #717940)
 
- -- Guillaume Delacour <gui@iroqwa.org>  Sun, 28 Jul 2013 18:05:26 +0200
+ -- Hans-Christoph Steiner <hans@eds.org>  Tue, 21 Oct 2014 14:18:20 -0400
 
 rsnapshot (1.3.1-4) unstable; urgency=low
 
