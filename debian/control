@@ -8,8 +8,8 @@ Build-Depends-Indep: autotools-dev, rsync, openssh-client | ssh-client,
                      lvm2, udev, dh-autoreconf
 Standards-Version: 3.9.6
 Homepage: http://www.rsnapshot.org/
-Vcs-Browser: http://anonscm.debian.org/gitweb/?p=collab-maint/rsnapshot.git
-Vcs-Git: git://anonscm.debian.org/collab-maint/rsnapshot.git
+Vcs-Browser: http://anonscm.debian.org/cgit/collab-maint/rsnapshot.git
+Vcs-Git: https://anonscm.debian.org/git/collab-maint/rsnapshot.git
 
 Package: rsnapshot
 Architecture: all
