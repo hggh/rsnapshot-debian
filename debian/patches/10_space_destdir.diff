@@ -3,9 +3,9 @@ Subject: Fix space in path problem
 Origin: upstream, http://rsnapshot.cvs.sourceforge.net/viewvc/rsnapshot/rsnapshot/rsnapshot-program.pl?r1=1.413&r2=1.414&view=patch
 Bug-Debian: http://bugs.debian.org/662636
 
---- a/rsnapshot-program.pl	2009/03/09 05:38:23	1.413
-+++ b/rsnapshot-program.pl	2009/03/27 21:54:02	1.414
-@@ -3692,8 +3692,7 @@
+--- a/rsnapshot-program.pl
++++ b/rsnapshot-program.pl
+@@ -3692,8 +3692,7 @@ sub rsync_backup_point {
  	$result = 1;
  	if (0 == $test) {
  		while ($tryCount < $rsync_numtries && $result !=0) {
@@ -15,7 +15,7 @@ Bug-Debian: http://bugs.debian.org/662636
  			$tryCount += 1;
  		}
  
-@@ -4728,8 +4728,7 @@
+@@ -4728,8 +4727,7 @@ sub rsync_cleanup_after_native_cp_al {
  	print_cmd(@cmd_stack);
  	
  	if (0 == $test) {

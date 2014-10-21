@@ -3,9 +3,9 @@ Subject: Use is_valid_script() for checking include_conf `backticks`
 Origin: upstream, http://rsnapshot.cvs.sourceforge.net/viewvc/rsnapshot/rsnapshot/rsnapshot-program.pl?r1=1.400&r2=1.401&view=patch
 Bug-Debian: http://bugs.debian.org/653285
 
---- a/rsnapshot-program.pl	2008/09/05 10:55:56	1.400
-+++ b/rsnapshot-program.pl	2008/09/05 11:02:35	1.401
-@@ -568,7 +568,7 @@
+--- a/rsnapshot-program.pl
++++ b/rsnapshot-program.pl
+@@ -568,7 +568,7 @@ sub parse_config_file {
  			$value =~ /^`(.*)`$/;
  			if(
  			    (defined($value) && -f $value && -r $value) ||

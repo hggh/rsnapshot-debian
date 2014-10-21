@@ -5,7 +5,7 @@ Forwarded: https://sourceforge.net/p/rsnapshot/patches/15/
 
 --- a/rsnapshot.conf.default.in
 +++ b/rsnapshot.conf.default.in
-@@ -80,6 +80,14 @@
+@@ -80,6 +80,14 @@ snapshot_root	/var/cache/rsnapshot/
  #
  #cmd_postexec	/path/to/postexec/script
  
@@ -20,7 +20,7 @@ Forwarded: https://sourceforge.net/p/rsnapshot/patches/15/
  #########################################
  #           BACKUP INTERVALS            #
  # Must be unique and in ascending order #
-@@ -188,6 +196,26 @@
+@@ -194,6 +202,26 @@ lockfile	/var/run/rsnapshot.pid
  #
  #rsync_numtries 0
  
@@ -47,7 +47,7 @@ Forwarded: https://sourceforge.net/p/rsnapshot/patches/15/
  ###############################
  ### BACKUP POINTS / SCRIPTS ###
  ###############################
-@@ -201,6 +229,8 @@
+@@ -207,6 +235,8 @@ backup	/usr/local/	localhost/
  #backup	/home/foo/My Documents/		localhost/
  #backup	/foo/bar/	localhost/	one_fs=1, rsync_short_args=-urltvpog
  #backup_script	/usr/local/bin/backup_pgsql.sh	localhost/postgres/
@@ -58,7 +58,7 @@ Forwarded: https://sourceforge.net/p/rsnapshot/patches/15/
  #backup_script	/bin/date "+ backup of example.com started at %c"	unused1
 --- a/configure.ac
 +++ b/configure.ac
-@@ -176,6 +176,37 @@
+@@ -176,6 +176,37 @@ dnl either way, set the cmd_ssh var
  AC_SUBST(CMD_SSH, "cmd_ssh	$SSH")
  
  
