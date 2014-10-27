@@ -1,5 +1,5 @@
-debian/cron.hourly/rsnapshot  etc/cron.hourly/
-debian/cron.daily/rsnapshot  etc/cron.daily/
-debian/cron.weekly/rsnapshot  etc/cron.weekly/
-debian/cron.monthly/rsnapshot  etc/cron.monthly/
-debian/default/rsnapshot  etc/default/
+debian/cron.hourly/rsnapshot  usr/share/doc/rsnapshot/examples/anacron/hourly
+debian/cron.daily/rsnapshot   usr/share/doc/rsnapshot/examples/anacron/daily
+debian/cron.weekly/rsnapshot  usr/share/doc/rsnapshot/examples/anacron/weekly
+debian/cron.monthly/rsnapshot usr/share/doc/rsnapshot/examples/anacron/monthly
+debian/default/rsnapshot      usr/share/doc/rsnapshot/examples/anacron
