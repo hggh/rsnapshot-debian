@@ -1,0 +1,18 @@
+Author: Dominik George <dominik.george@teckids.org>
+Description: Rsync stats output changes
+Forwarded: no
+Bug-Debian: https://bugs.debian.org/784650
+
+--- a/utils/rsnapreport.pl	2015-05-10 19:04:38.865879347 +0200
++++ b/utils/rsnapreport.pl	2015-05-10 19:02:48.793592477 +0200
+@@ -93,8 +93,8 @@ while (my $line = nextLine(\@rsnapout)){
+ 			elsif($line =~ /Number of files:\s+(\d+)/){
+ 				$bkdata{$source}{'files'}=$1;
+ 			}
+-			elsif($line =~ /Number of files transferred:\s+(\d+)/){
+-				$bkdata{$source}{'files_tran'}=$1;
++			elsif($line =~ /Number of (regular )?files transferred:\s+(\d+)/){
++				$bkdata{$source}{'files_tran'}=$2;
+ 			}
+ 			elsif($line =~ /Total file size:\s+(\d+)/){
+ 				$bkdata{$source}{'file_size'}=$1;

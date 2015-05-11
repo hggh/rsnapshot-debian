@@ -41,5 +41,9 @@ override_dh_fixperms:
 	# Fix permissions of the default rsnapshot_root directory
 	chmod 0700 $(CURDIR)/debian/rsnapshot/var/cache/rsnapshot
 
+override_dh_compress:
+	# don't compress utils examples perl files
+	dh_compress --exclude=.pl
+
 %:
 	dh $@ --with autotools_dev --with autoreconf
