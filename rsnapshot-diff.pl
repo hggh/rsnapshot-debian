@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!@PERL@ -w
 
 ##############################################################################
 # rsnapshot-diff
@@ -13,7 +13,7 @@
 # http://www.rsnapshot.org/
 ##############################################################################
 
-# $Id: rsnapshot-diff.pl,v 1.3 2006/05/31 19:51:03 drhyde Exp $
+# $Id: rsnapshot-diff.pl,v 1.6 2010/08/10 13:00:15 drhyde Exp $
 
 =head1 NAME
 
@@ -32,20 +32,23 @@ my $program_name = 'rsnapshot-diff';
 my %opts;
 my $verbose = 0;
 my $ignore = 0;
+my $show_size = 0;
 
-my $result = getopts('vVhi', \%opts);
+my $result = getopts('vVhHis', \%opts);
 
 # help
 if ($opts{'h'}) {
     print qq{
-    $program_name [-vVhi] dir1 dir2
+    $program_name [-vVHhi] dir1 dir2
 
     $program_name shows the differences between two 'rsnapshot' backups.
 
     -h    show this help
-    -v    be verbose
-    -V    be more verbose (mutter about unchanged files)
+    -H    also show "human" sizes - MB and GB as well as just bytes
     -i    ignore symlinks, directories, and special files in verbose output
+    -s    show the size of each changed file
+    -v    be verbose
+    -V    be more verbose (mutter about unchanged files and about symlinks)
     dir1  the first directory to look at
     dir2  the second directory to look at
 
@@ -84,20 +87,30 @@ and added.
 
 Displays help information
 
-=item -v (verbose)
+=item -H (human)
 
-Be verbose.  This will spit out a list of all changes as they are encountered,
-as well as the summary at the end.
-
-=item -V (more verbose)
-
-Be more verbose - as well as listed changes, unchanged files will be listed
-too.
+Display more human-friendly numbers - as well as showing the number of
+bytes changed, also show MB and GB.
 
 =item -i (ignore)
 
 If verbosity is turned on, -i suppresses information about symlinks,
 directories, and special files.
+
+=item -s (show size)
+
+Show the size of each changed file after the + or - sign.  To sort the files by
+decreasing size, use this option and run the output through "sort -k 2 -rn".
+
+=item -v (verbose)
+
+Be verbose.  This will spit out a list of all changes as they are encountered,
+apart from symlink, as well as the summary at the end.
+
+=item -V (more verbose)
+
+Be more verbose - as well as listing changed files, unchanged files and
+symlinks will be listed too.
 
 =item dir1 and dir2
 
@@ -120,22 +133,39 @@ if ($opts{'V'}) { $verbose = 2; }
 # ignore
 if ($opts{'i'}) { $ignore = 1; }
 
+# size
+if ($opts{'s'}) { $show_size = 1; }
 
 if(!exists($ARGV[1]) || !-d $ARGV[0] || !-d $ARGV[1]) {
     die("$program_name\nUsage: $program_name [-vVhi] dir1 dir2\nType $program_name -h for details\n");
 }
 
 my($dirold, $dirnew) = @ARGV;
-($dirold, $dirnew) = ($dirnew, $dirold) if(-M $dirold < -M $dirnew);
-print "Comparing $dirold to $dirnew\n";
-
 my($addedfiles, $addedspace, $deletedfiles, $deletedspace) = (0, 0, 0, 0);
+my($addedspace_mb, $addedspace_gb, $deletedspace_mb, $deletedspace_gb) = (0, 0, 0, 0);
+
+($dirold, $dirnew) = ($dirnew, $dirold) if(-M $dirold < -M $dirnew);
+
+# remove trailing slahes, if any
+$dirold =~ s/\/+$//;
+$dirnew =~ s/\/+$//;
+
+print "Comparing $dirold to $dirnew\n";
 
 compare_dirs($dirold, $dirnew);
 
+$addedspace_mb = sprintf("%.2f", $addedspace / (1024 * 1024));
+$addedspace_gb = sprintf("%.2f", $addedspace_mb / 1024);
+$deletedspace_mb = sprintf("%.2f", $deletedspace / (1024 * 1024));
+$deletedspace_gb = sprintf("%.2f", $deletedspace_mb / 1024);
+
 print "Between $dirold and $dirnew:\n";
-print "  $addedfiles were added, taking $addedspace bytes;\n";
-print "  $deletedfiles were removed, saving $deletedspace bytes;\n";
+print "  $addedfiles were added, taking $addedspace bytes".
+  ($opts{H} ? " ($addedspace_mb MB, $addedspace_gb GB)" : '').
+  "\n";
+print "  $deletedfiles were removed, saving $deletedspace bytes".
+  ($opts{H} ? " ($deletedspace_mb MB, $deletedspace_gb GB)" : '').
+  "\n";
 
 sub compare_dirs {
     my($old, $new) = @_;
@@ -176,10 +206,14 @@ sub add {
     print "Adding ".join(', ', @added)."\n" if(DEBUG && @added);
     foreach(grep { !-d } @added) {
         $addedfiles++;
-        $addedspace += (mystat($_))[7];
+        my $size = (mystat($_))[7];
+        $addedspace += $size;
         # if ignore is on, only print files
         unless ($ignore && (-l || !-f)) {
-            print "+ $_\n" if($verbose);
+            print ''.($show_size ? "+ $size $_" : "+ $_").
+	          (-l $_ ? ' (symlink)' : '').
+		  "\n"
+	        if($verbose == 2 || ($verbose == 1 && !-l $_));
         }
     }
     foreach my $dir (grep { !-l && -d } @added) {
@@ -193,10 +227,14 @@ sub remove {
     print "Removing ".join(', ', @removed)."\n" if(DEBUG && @removed);
     foreach(grep { !-d } @removed) {
         $deletedfiles++;
-        $deletedspace += (mystat($_))[7];
+        my $size = (mystat($_))[7];
+        $deletedspace += $size;
         # if ignore is on, only print files
         unless ($ignore && (-l || !-f)) {
-            print "- $_\n" if($verbose);
+            print ''.($show_size ? "- $size $_" : "- $_").
+	          (-l $_ ? ' (symlink)' : '').
+		  "\n"
+	        if($verbose == 2 || ($verbose == 1 && !-l $_));
         }
     }
     foreach my $dir (grep { !-l && -d } @removed) {
@@ -237,7 +275,7 @@ David Cantrell E<lt>david@cantrell.org.ukE<gt>
 
 =head1 COPYRIGHT
 
-Copyright 2005 David Cantrell
+Copyright 2005-2010 David Cantrell
 
 =head1 LICENCE
 
