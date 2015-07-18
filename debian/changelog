@@ -1,3 +1,27 @@
+rsnapshot (1.4.0-1) unstable; urgency=medium
+
+  * New upstream release (Closes: #786854)
+   + Retains renamed, provide helper migration script debian/rename_retains.sh
+     and changes retains in debian/cron.d
+   + Drop accepted or cherry picked patches:
+     03_pod_missing_back.diff
+     06_fix_random_file_verify.diff
+     08_manpage_hourly_to_daily.diff
+     09_strip_backtick.diff
+     10_space_destdir.diff
+     11_lvm_snapshots.diff
+     12_include_conf_with_arguments.diff
+     13_print_warn.diff
+     14_rsync_rsh_quoting.diff
+     16_configtest_manpage.diff
+     17_linux_lvm_cmd_lvremove_silenced.diff
+     19_cmd_postexec_umount.diff
+  * Refresh debian/patches/18_rsnapreport_rsync_output.diff to remove "," in
+    bytes rsync transfert output and required verbose level (Closes: #784650)
+  * debian/docs: Use README.md instead of README, remove no more provided TODO
+
+ -- Guillaume Delacour <gui@iroqwa.org>  Sat, 18 Jul 2015 14:03:05 +0000
+
 rsnapshot (1.3.1-7) unstable; urgency=medium
 
   * Remove obsolete conffiles anacron scripts (Closes: #767124)

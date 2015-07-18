@@ -3,3 +3,4 @@ debian/cron.daily/rsnapshot   usr/share/doc/rsnapshot/examples/anacron/daily
 debian/cron.weekly/rsnapshot  usr/share/doc/rsnapshot/examples/anacron/weekly
 debian/cron.monthly/rsnapshot usr/share/doc/rsnapshot/examples/anacron/monthly
 debian/default/rsnapshot      usr/share/doc/rsnapshot/examples/anacron
+debian/rename_retains.sh    usr/share/doc/rsnapshot/

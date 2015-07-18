@@ -1,16 +1,4 @@
 01_rsnapshot_conf.diff
-03_pod_missing_back.diff
 05_backup_pgsql.diff
-06_fix_random_file_verify.diff
-08_manpage_hourly_to_daily.diff
-09_strip_backtick.diff
-10_space_destdir.diff
-11_lvm_snapshots.diff
-12_include_conf_with_arguments.diff
-13_print_warn.diff
-14_rsync_rsh_quoting.diff
 15-remove-dead-external-css-link.patch
-16_configtest_manpage.diff
-17_linux_lvm_cmd_lvremove_silenced.diff
 18_rsnapreport_rsync_output.diff
-19_cmd_postexec_umount.diff

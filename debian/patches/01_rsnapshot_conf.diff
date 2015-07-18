@@ -5,12 +5,8 @@ Subject: rsnapshot Debian configuration choices
  * Change default Debian directory for snapshots
  * Change path for rsnapshot-diff
  * Manpage: point to the real default file  and binary on Debian systems
- * Replace interval (deprecated alias) with retain
  * Use GNU cp, to take care of special files
  * Document use of stop_on_stale_lockfile option
- * Change description of rsync_numtries, as the source code describe the right
-   behavior
-
 Forwarded: not-needed
 
 --- a/rsnapshot.conf.default.in
@@ -42,21 +38,6 @@ Forwarded: not-needed
  
  # Specify the path to a script (and any optional arguments) to run right
  # before rsnapshot syncs files
-@@ -86,10 +86,10 @@
- # i.e. hourly, daily, weekly, etc.      #
- #########################################
- 
--interval	hourly	6
--interval	daily	7
--interval	weekly	4
--#interval	monthly	3
-+retain		hourly	6
-+retain		daily	7
-+retain		weekly	4
-+#retain	monthly	3
- 
- ############################################
- #              GLOBAL OPTIONS              #
 @@ -113,7 +113,7 @@
  # If you enable this, data will be written to the file you specify. The
  # amount of data written is controlled by the "loglevel" parameter.
@@ -79,20 +60,6 @@ Forwarded: not-needed
  # Default rsync args. All rsync commands have at least these options set.
  #
  #rsync_short_args	-a
-@@ -181,10 +187,10 @@
- #
- #use_lazy_deletes	0
- 
--# Number of rsync re-tries. If you experience any network problems or
-+# Number of rsync tries. If you experience any network problems or
- # network card issues that tend to cause ssh to crap-out with
--# "Corrupted MAC on input" errors, for example, set this to a non-zero
--# value to have the rsync operation re-tried
-+# "Corrupted MAC on input" errors, for example, set this to a  value higher
-+# than 1 to have the rsync operation re-tried
- #
- #rsync_numtries 0
- 
 --- a/rsnapshot-program.pl
 +++ b/rsnapshot-program.pl
 @@ -6120,10 +6120,10 @@
@@ -112,17 +79,17 @@ Forwarded: not-needed
  
  =over 4
  
--B<0 */4 * * *         /usr/local/bin/rsnapshot hourly>
-+B<0 */4 * * *         /usr/bin/rsnapshot hourly>
+-B<0 */4 * * *         /usr/local/bin/rsnapshot alpha>
++B<0 */4 * * *         /usr/bin/rsnapshot alpha>
  
--B<50 23 * * *         /usr/local/bin/rsnapshot daily>
-+B<50 23 * * *         /usr/bin/rsnapshot daily>
+-B<50 23 * * *         /usr/local/bin/rsnapshot beta>
++B<50 23 * * *         /usr/bin/rsnapshot beta>
  
--B<40 23 * * 6         /usr/local/bin/rsnapshot weekly>
-+B<40 23 * * 6         /usr/bin/rsnapshot weekly>
+-B<40 23 * * 6         /usr/local/bin/rsnapshot gamma>
++B<40 23 * * 6         /usr/bin/rsnapshot gamma>
  
--B<30 23 1 * *         /usr/local/bin/rsnapshot monthly>
-+B<30 23 1 * *         /usr/bin/rsnapshot monthly>
+-B<30 23 1 * *         /usr/local/bin/rsnapshot delta>
++B<30 23 1 * *         /usr/bin/rsnapshot delta>
  
  =back
  
@@ -130,17 +97,17 @@ Forwarded: not-needed
  
  =over 4
  
--B<0 */4 * * *         /usr/local/bin/rsnapshot sync && /usr/local/bin/rsnapshot hourly>
-+B<0 */4 * * *         /usr/bin/rsnapshot sync && /usr/bin/rsnapshot hourly>
+-B<0 */4 * * *         /usr/local/bin/rsnapshot sync && /usr/local/bin/rsnapshot alpha>
++B<0 */4 * * *         /usr/bin/rsnapshot sync && /usr/bin/rsnapshot alpha>
  
--B<50 23 * * *         /usr/local/bin/rsnapshot daily>
-+B<50 23 * * *         /usr/bin/rsnapshot daily>
+-B<50 23 * * *         /usr/local/bin/rsnapshot beta>
++B<50 23 * * *         /usr/bin/rsnapshot beta>
  
--B<40 23 1,8,15,22 * * /usr/local/bin/rsnapshot weekly>
-+B<40 23 1,8,15,22 * * /usr/bin/rsnapshot weekly>
+-B<40 23 1,8,15,22 * * /usr/local/bin/rsnapshot gamma>
++B<40 23 1,8,15,22 * * /usr/bin/rsnapshot gamma>
  
--B<30 23 1 * *         /usr/local/bin/rsnapshot monthly>
-+B<30 23 1 * *         /usr/bin/rsnapshot monthly>
+-B<30 23 1 * *         /usr/local/bin/rsnapshot delta>
++B<30 23 1 * *         /usr/bin/rsnapshot delta>
  
  =back
  
