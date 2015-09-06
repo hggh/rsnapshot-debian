@@ -1,3 +1,12 @@
+rsnapshot (1.3.1-4+deb8u1) jessie; urgency=medium
+
+  * Fix regression on --rsh with args: Applied patch from Upstream to fix --rsh
+    command line arguments with quotes.
+    The --rsh=... argument to rsync was erroneously quoted when added to the
+    @rsync_long_args_stack with options set.
+
+ -- Jonas Genannt <genannt@debian.org>  Sun, 06 Sep 2015 12:33:41 +0200
+
 rsnapshot (1.3.1-4) unstable; urgency=low
 
   * debian/patches/01_rsnapshot_conf: Refresh patch to fix path of rsnapshot in
