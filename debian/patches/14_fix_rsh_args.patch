@@ -1,0 +1,28 @@
+From f0b3b27d174257bf2a8ad29b8c36499bb7b2fb79 Mon Sep 17 00:00:00 2001
+From: Edwin Mons <git@home.mons.net>
+Date: Wed, 18 Sep 2013 22:39:11 +0200
+Subject: [PATCH] Fix --rsh commandline option
+Bug: https://github.com/rsnapshot/rsnapshot/commit/30380587aeab201311af9428f7c47621ade691c8
+
+The --rsh=... argument to rsync was erroneously quoted when added to the
+@rsync_long_args_stack with options set.
+
+Test-Information:
+
+Unit tests pass.
+Tested and verified on Debian 7.0
+---
+ rsnapshot-program.pl | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+--- a/rsnapshot-program.pl
++++ b/rsnapshot-program.pl
+@@ -3452,7 +3452,7 @@
+ 		
+ 		# if we have any args for SSH, add them
+ 		if ( defined($ssh_args) ) {
+-			push( @rsync_long_args_stack, "--rsh=\"$config_vars{'cmd_ssh'} $ssh_args\"" );
++			push( @rsync_long_args_stack, "--rsh=$config_vars{'cmd_ssh'} $ssh_args" );
+ 			
+ 		# no arguments is the default
+ 		} else {
